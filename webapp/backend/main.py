@@ -1102,6 +1102,7 @@ class OrderCreate(BaseModel):
     location_link: str = ""
     mahsulotlar:   str
     jami_summa:    int = 0
+    mahsulot_rasm: str | None = None
 
     @field_validator("mahsulotlar")
     @classmethod
@@ -1122,8 +1123,24 @@ def _sheets_get_params(params: dict) -> dict:
         return json.loads(r.read())
 
 
-def _tg_order_notify(text: str):
-    """Adminga buyurtma haqida oddiy matnli xabar (parse_mode siz — havola xavfsiz)."""
+def _tg_order_notify(text: str, photo_url: str | None = None):
+    """Adminga buyurtma haqida xabar: rasm bo’lsa sendPhoto, bo’lmasa sendMessage."""
+    if photo_url:
+        try:
+            payload = json.dumps({
+                "chat_id": SUPERADMIN_ID,
+                "photo":   photo_url,
+                "caption": text[:1024],
+            }).encode()
+            req = urllib.request.Request(
+                f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto",
+                data=payload, headers={"Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=10):
+                return
+        except Exception as e:
+            log.warning("sendPhoto xatoligi, sendMessage ga o’tildi: %s", e)
+
     payload = json.dumps({"chat_id": SUPERADMIN_ID, "text": text}).encode()
     req = urllib.request.Request(
         f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
@@ -1140,13 +1157,13 @@ async def send_order_to_admin(order_id: str, data: OrderCreate):
     text = (
         f"🛒 Yangi buyurtma!\n\n"
         f"📋 {order_id}\n"
-        f"👤 {data.fullname or '—'}\n"
-        f"📞 {data.phone or '—'}\n"
-        f"📍 {data.location_link or 'Manzil yo‘q'}\n\n"
+        f"👤 {data.fullname or ‘—‘}\n"
+        f"📞 {data.phone or ‘—‘}\n"
+        f"📍 {data.location_link or ‘Manzil yo’q’}\n\n"
         f"📦 Mahsulotlar:\n{data.mahsulotlar}\n\n"
-        f"💰 Jami: {data.jami_summa:,} so‘m".replace(",", " ")
+        f"💰 Jami: {data.jami_summa:,} so’m".replace(",", " ")
     )
-    await asyncio.to_thread(_tg_order_notify, text)
+    await asyncio.to_thread(_tg_order_notify, text, data.mahsulot_rasm)
 
 
 @app.post("/order/create")

@@ -8,11 +8,12 @@ object CartManager {
     private val _cartItems = MutableStateFlow<List<CartItem>>(emptyList())
     val cartItems: StateFlow<List<CartItem>> = _cartItems.asStateFlow()
 
-    fun addToCart(product: Product, variantName: String? = null, variantPrice: Double? = null) {
+    fun addToCart(product: Product, variantName: String? = null, variantPrice: Double? = null, variantImageUrl: String? = null) {
         val item = CartItem(
             product = product,
             variantName = variantName,
-            effectivePrice = variantPrice ?: product.price
+            effectivePrice = variantPrice ?: product.price,
+            variantImageUrl = variantImageUrl
         )
         _cartItems.value = _cartItems.value + item
     }

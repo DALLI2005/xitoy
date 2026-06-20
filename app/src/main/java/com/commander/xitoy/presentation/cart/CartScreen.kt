@@ -155,7 +155,7 @@ fun CartScreen(
                         CartItemCard(
                             item = item,
                             quantity = quantity,
-                            onIncrement = { CartManager.addToCart(item.product, item.variantName, item.effectivePrice) },
+                            onIncrement = { CartManager.addToCart(item.product, item.variantName, item.effectivePrice, item.variantImageUrl) },
                             onDecrement = { CartManager.removeFromCart(item) },
                             onRemoveAll = { CartManager.removeAllOf(item) }
                         )
@@ -225,13 +225,15 @@ fun CartScreen(
                             }
                             android.util.Log.d("VariantDebug", "Order itemsText: $itemsText")
                             showDialog = false
+                            val firstItem = groupedItems.firstOrNull()?.first
                             viewModel.placeOrder(
                                 telegramId = session?.telegramId ?: "",
                                 fullname = name,
                                 phone = phone,
                                 locationLink = session?.address ?: "",
                                 mahsulotlar = itemsText,
-                                jamiSumma = totalPrice.toLong()
+                                jamiSumma = totalPrice.toLong(),
+                                mahsulotRasm = firstItem?.variantImageUrl ?: firstItem?.product?.imageUrl
                             )
                         } else {
                             Toast.makeText(context, "Iltimos, ma'lumotlarni to'liq kiriting!", Toast.LENGTH_SHORT).show()
@@ -406,7 +408,7 @@ private fun CartItemCard(
             horizontalArrangement = Arrangement.spacedBy(11.dp)
         ) {
             AsyncImage(
-                model = product.imageUrl,
+                model = item.variantImageUrl ?: product.imageUrl,
                 contentDescription = product.name,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier

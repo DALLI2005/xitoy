@@ -14,7 +14,8 @@ data class OrderRequest(
     val phone: String,
     val location_link: String,
     val mahsulotlar: String,
-    val jami_summa: Long
+    val jami_summa: Long,
+    val mahsulot_rasm: String? = null
 )
 
 data class OrderResponse(

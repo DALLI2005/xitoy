@@ -63,7 +63,8 @@ class CartViewModel @Inject constructor(
         phone: String,
         locationLink: String,
         mahsulotlar: String,
-        jamiSumma: Long
+        jamiSumma: Long,
+        mahsulotRasm: String? = null
     ) {
         viewModelScope.launch {
             _orderState.value = OrderState.Loading
@@ -75,7 +76,8 @@ class CartViewModel @Inject constructor(
                         phone = phone,
                         location_link = locationLink,
                         mahsulotlar = mahsulotlar,
-                        jami_summa = jamiSumma
+                        jami_summa = jamiSumma,
+                        mahsulot_rasm = mahsulotRasm
                     )
                 )
                 _orderState.value = OrderState.Success(response.order_id)
