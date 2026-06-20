@@ -1095,14 +1095,23 @@ async def get_stats(_: dict = Depends(require_super)):
 
 
 # ── Buyurtmalar (mijoz ilovasi) ────────────────────────────────────────────────
+class OrderItemDetail(BaseModel):
+    nomi:    str
+    variant: str | None = None
+    soni:    int        = 1
+    narx:    int        = 0
+    rasm:    str | None = None
+
+
 class OrderCreate(BaseModel):
-    telegram_id:   str
-    fullname:      str = ""
-    phone:         str = ""
-    location_link: str = ""
-    mahsulotlar:   str
-    jami_summa:    int = 0
-    mahsulot_rasm: str | None = None
+    telegram_id:         str
+    fullname:            str = ""
+    phone:               str = ""
+    location_link:       str = ""
+    mahsulotlar:         str
+    jami_summa:          int = 0
+    mahsulot_rasm:       str | None             = None
+    mahsulotlar_royxati: list[OrderItemDetail]  = []
 
     @field_validator("mahsulotlar")
     @classmethod
@@ -1154,16 +1163,45 @@ def _tg_order_notify(text: str, photo_url: str | None = None):
 
 
 async def send_order_to_admin(order_id: str, data: OrderCreate):
-    text = (
-        f"🛒 Yangi buyurtma!\n\n"
-        f"📋 {order_id}\n"
-        f"👤 {data.fullname or '—'}\n"
-        f"📞 {data.phone or '—'}\n"
-        f"📍 {data.location_link or 'Manzil yo’q'}\n\n"
-        f"📦 Mahsulotlar:\n{data.mahsulotlar}\n\n"
-        f"💰 Jami: {data.jami_summa:,} so’m".replace(",", " ")
-    )
-    await asyncio.to_thread(_tg_order_notify, text, data.mahsulot_rasm)
+    dash     = "—"
+    apostr   = "’"
+    fullname = data.fullname  or dash
+    phone    = data.phone     or dash
+    location = data.location_link or f"Manzil yo{apostr}q"
+    jami_fmt = f"{data.jami_summa:,}".replace(",", " ")
+
+    if data.mahsulotlar_royxati:
+        for item in data.mahsulotlar_royxati:
+            narx_fmt = f"{item.narx:,}".replace(",", " ")
+            lines = [f"\U0001f4e6 {item.nomi}"]
+            if item.variant:
+                lines.append(f"\U0001f3a8 Rangi: {item.variant}")
+            lines.append(f"\U0001f522 Soni: {item.soni} ta")
+            lines.append(f"\U0001f4b5 Narxi: {narx_fmt} so{apostr}m")
+            caption = "\n".join(lines)
+            await asyncio.to_thread(_tg_order_notify, caption, item.rasm)
+            await asyncio.sleep(0.4)
+
+        summary = (
+            f"\U0001f6d2 Yangi buyurtma!\n\n"
+            f"\U0001f4cb {order_id}\n"
+            f"\U0001f464 {fullname}\n"
+            f"\U0001f4de {phone}\n"
+            f"\U0001f4cd {location}\n\n"
+            f"\U0001f4b0 Jami: {jami_fmt} so{apostr}m"
+        )
+        await asyncio.to_thread(_tg_order_notify, summary)
+    else:
+        text = (
+            f"\U0001f6d2 Yangi buyurtma!\n\n"
+            f"\U0001f4cb {order_id}\n"
+            f"\U0001f464 {fullname}\n"
+            f"\U0001f4de {phone}\n"
+            f"\U0001f4cd {location}\n\n"
+            f"\U0001f4e6 Mahsulotlar:\n{data.mahsulotlar}\n\n"
+            f"\U0001f4b0 Jami: {jami_fmt} so{apostr}m"
+        )
+        await asyncio.to_thread(_tg_order_notify, text, data.mahsulot_rasm)
 
 
 @app.post("/order/create")

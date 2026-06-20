@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.commander.xitoy.data.remote.CartCancelRequest
 import com.commander.xitoy.data.remote.CartSyncRequest
 import com.commander.xitoy.data.remote.OrderApi
+import com.commander.xitoy.data.remote.OrderItemDetail
 import com.commander.xitoy.data.remote.OrderRequest
 import com.commander.xitoy.domain.model.CartManager
 import com.commander.xitoy.domain.model.SessionManager
@@ -64,7 +65,8 @@ class CartViewModel @Inject constructor(
         locationLink: String,
         mahsulotlar: String,
         jamiSumma: Long,
-        mahsulotRasm: String? = null
+        mahsulotRasm: String? = null,
+        mahsulotlarRoyxati: List<OrderItemDetail> = emptyList()
     ) {
         viewModelScope.launch {
             _orderState.value = OrderState.Loading
@@ -77,7 +79,8 @@ class CartViewModel @Inject constructor(
                         location_link = locationLink,
                         mahsulotlar = mahsulotlar,
                         jami_summa = jamiSumma,
-                        mahsulot_rasm = mahsulotRasm
+                        mahsulot_rasm = mahsulotRasm,
+                        mahsulotlar_royxati = mahsulotlarRoyxati
                     )
                 )
                 _orderState.value = OrderState.Success(response.order_id)

@@ -8,6 +8,14 @@ import retrofit2.http.POST
 import retrofit2.http.Part
 import retrofit2.http.Query
 
+data class OrderItemDetail(
+    val nomi: String,
+    val variant: String? = null,
+    val soni: Int,
+    val narx: Long,
+    val rasm: String? = null
+)
+
 data class OrderRequest(
     val telegram_id: String,
     val fullname: String,
@@ -15,7 +23,8 @@ data class OrderRequest(
     val location_link: String,
     val mahsulotlar: String,
     val jami_summa: Long,
-    val mahsulot_rasm: String? = null
+    val mahsulot_rasm: String? = null,
+    val mahsulotlar_royxati: List<OrderItemDetail> = emptyList()
 )
 
 data class OrderResponse(

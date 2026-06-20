@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.commander.xitoy.data.remote.OrderItemDetail
 import com.commander.xitoy.domain.model.CartItem
 import com.commander.xitoy.domain.model.CartManager
 import com.commander.xitoy.domain.model.Product
@@ -223,17 +224,26 @@ fun CartScreen(
                                 val suffix = if (item.variantName != null) " (${item.variantName})" else ""
                                 "${item.product.name}$suffix x$q"
                             }
-                            android.util.Log.d("VariantDebug", "Order itemsText: $itemsText")
+                            val royxat = groupedItems.map { (item, q) ->
+                                OrderItemDetail(
+                                    nomi    = item.product.name,
+                                    variant = item.variantName,
+                                    soni    = q,
+                                    narx    = item.effectivePrice.toLong(),
+                                    rasm    = item.variantImageUrl ?: item.product.imageUrl
+                                )
+                            }
                             showDialog = false
                             val firstItem = groupedItems.firstOrNull()?.first
                             viewModel.placeOrder(
-                                telegramId = session?.telegramId ?: "",
-                                fullname = name,
-                                phone = phone,
-                                locationLink = session?.address ?: "",
-                                mahsulotlar = itemsText,
-                                jamiSumma = totalPrice.toLong(),
-                                mahsulotRasm = firstItem?.variantImageUrl ?: firstItem?.product?.imageUrl
+                                telegramId          = session?.telegramId ?: "",
+                                fullname            = name,
+                                phone               = phone,
+                                locationLink        = session?.address ?: "",
+                                mahsulotlar         = itemsText,
+                                jamiSumma           = totalPrice.toLong(),
+                                mahsulotRasm        = firstItem?.variantImageUrl ?: firstItem?.product?.imageUrl,
+                                mahsulotlarRoyxati  = royxat
                             )
                         } else {
                             Toast.makeText(context, "Iltimos, ma'lumotlarni to'liq kiriting!", Toast.LENGTH_SHORT).show()
