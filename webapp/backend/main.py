@@ -1173,7 +1173,10 @@ async def send_order_to_admin(order_id: str, data: OrderCreate):
     if data.mahsulotlar_royxati:
         for item in data.mahsulotlar_royxati:
             narx_fmt = f"{item.narx:,}".replace(",", " ")
-            lines = [f"\U0001f4e6 {item.nomi}"]
+            lines = [
+                f"\U0001f4cb {order_id}",
+                f"\U0001f4e6 {item.nomi}",
+            ]
             if item.variant:
                 lines.append(f"\U0001f3a8 Rangi: {item.variant}")
             lines.append(f"\U0001f522 Soni: {item.soni} ta")

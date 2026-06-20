@@ -150,7 +150,7 @@ fun CartScreen(
                 LazyColumn(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(11.dp),
-                    contentPadding = PaddingValues(bottom = 16.dp)
+                    contentPadding = PaddingValues(bottom = 200.dp)
                 ) {
                     items(groupedItems, key = { "${it.first.product.name}|${it.first.variantName}" }) { (item, quantity) ->
                         CartItemCard(
@@ -162,15 +162,20 @@ fun CartScreen(
                         )
                     }
                 }
-
-                OrderSummary(
-                    totalPrice = totalPrice,
-                    itemCount = cartItems.size,
-                    enabled = cartItems.isNotEmpty() && orderState !is OrderState.Loading,
-                    onOrderClick = { showDialog = true }
-                )
-                Spacer(modifier = Modifier.height(104.dp))
             }
+        }
+
+        // Sticky buyurtma paneli
+        if (groupedItems.isNotEmpty()) {
+            OrderSummary(
+                totalPrice = totalPrice,
+                itemCount = cartItems.size,
+                enabled = cartItems.isNotEmpty() && orderState !is OrderState.Loading,
+                onOrderClick = { showDialog = true },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            )
         }
 
         // Loading overlay
@@ -556,10 +561,11 @@ private fun OrderSummary(
     totalPrice: Double,
     itemCount: Int,
     enabled: Boolean,
-    onOrderClick: () -> Unit
+    onOrderClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         colors = CardDefaults.cardColors(containerColor = DalliSurface),
