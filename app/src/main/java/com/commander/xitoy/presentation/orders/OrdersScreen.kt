@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,9 +21,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocalShipping
@@ -54,6 +50,11 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.commander.xitoy.data.remote.OrderItem
 import com.commander.xitoy.domain.model.SessionManager
+import com.commander.xitoy.presentation.common.ORDER_STAGES
+import com.commander.xitoy.presentation.common.OrderProgressBar
+import com.commander.xitoy.presentation.common.holatColors
+import com.commander.xitoy.presentation.common.holatDisplay
+import com.commander.xitoy.presentation.common.holatToStage
 import com.commander.xitoy.ui.theme.DalliBackground
 import com.commander.xitoy.ui.theme.DalliLine
 import com.commander.xitoy.ui.theme.DalliLine2
@@ -65,41 +66,6 @@ import com.commander.xitoy.ui.theme.DalliSuccessSoft
 import com.commander.xitoy.ui.theme.DalliSurface
 import com.commander.xitoy.ui.theme.DalliText
 import com.commander.xitoy.ui.theme.DalliTextSecondary
-
-// Asosiy bosqichlar (progress bar uchun)
-private data class Stage(val short: String, val full: String)
-
-private val STAGES = listOf(
-    Stage("Yangi",       "Buyurtma berildi"),
-    Stage("Tasdiqlandi", "Tasdiqlandi"),
-    Stage("Yo'lda",      "Yo'lda (transport)"),
-    Stage("Yetkazildi",  "Yetkazib berildi")
-)
-
-private fun holatToStage(holat: String) = when (holat) {
-    "Tolov_kutilmoqda" -> 0
-    "Tasdiqlandi"      -> 1
-    "Yo'lda"           -> 2
-    "Yetkazildi"       -> 3
-    "Rad_etildi"       -> 0
-    else               -> 0
-}
-
-private fun holatDisplay(holat: String): String = when (holat) {
-    "Tolov_kutilmoqda" -> "To'lov kutilmoqda"
-    "Rad_etildi"       -> "Rad etildi"
-    else               -> holat
-}
-
-private fun holatColors(holat: String): Pair<Color, Color> = when (holat) {
-    "Yangi"            -> Color(0xFFEEF2FF) to Color(0xFF1B40D4)
-    "Tolov_kutilmoqda" -> Color(0xFFFEF9C3) to Color(0xFFCA8A04)
-    "Tasdiqlandi"      -> Color(0xFFEDE9FE) to Color(0xFF7C3AED)
-    "Yo'lda"           -> Color(0xFFFEF3C7) to Color(0xFFD97706)
-    "Yetkazildi"       -> DalliSuccessSoft to DalliSuccess
-    "Rad_etildi"       -> Color(0xFFFFE4E4) to Color(0xFFDC2626)
-    else               -> Color(0xFFEEF2FF) to Color(0xFF1B40D4)
-}
 
 private val MONTH_EN = listOf("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec")
 private val MONTH_UZ = listOf("yanvar","fevral","mart","aprel","may","iyun","iyul","avgust","sentabr","oktabr","noyabr","dekabr")
@@ -247,7 +213,7 @@ private fun OrderCard(
             }
 
             Spacer(modifier = Modifier.height(12.dp))
-            ProgressBar(stage = stage)
+            OrderProgressBar(stage = stage)
             Spacer(modifier = Modifier.height(11.dp))
 
             Text(
@@ -344,50 +310,12 @@ private fun StatusBadge(text: String, bg: Color, color: Color) {
 }
 
 @Composable
-private fun ProgressBar(stage: Int) {
-    val done = stage == STAGES.size - 1
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        STAGES.indices.forEach { i ->
-            val active = i <= stage
-            val fillColor = when {
-                active && done -> DalliSuccess
-                active         -> DalliPrimary
-                else           -> DalliLine2
-            }
-            val fill by animateFloatAsState(
-                targetValue = if (active) 1f else 0f,
-                animationSpec = tween(
-                    durationMillis = 500,
-                    delayMillis    = i * 130,
-                    easing         = FastOutSlowInEasing
-                ),
-                label = "fill_$i"
-            )
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(5.dp)
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(DalliLine2)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(fill)
-                        .background(fillColor)
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun OrderTimeline(stage: Int) {
     Column {
-        STAGES.forEachIndexed { i, s ->
+        ORDER_STAGES.forEachIndexed { i, s ->
             val isDone = i < stage
             val isCurrent = i == stage
-            val isLast = i == STAGES.size - 1
+            val isLast = i == ORDER_STAGES.size - 1
 
             Row {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {

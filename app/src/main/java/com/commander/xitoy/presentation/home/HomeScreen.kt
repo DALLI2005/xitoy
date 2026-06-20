@@ -68,9 +68,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.commander.xitoy.data.remote.OrderItem
+import com.commander.xitoy.domain.model.CartManager
 import com.commander.xitoy.domain.model.CurrencyRateManager
 import com.commander.xitoy.domain.model.FavoritesManager
 import com.commander.xitoy.domain.model.Product
+import com.commander.xitoy.domain.model.SessionManager
+import com.commander.xitoy.presentation.common.OrderProgressBar
+import com.commander.xitoy.presentation.common.holatDisplay
+import com.commander.xitoy.presentation.common.holatToStage
+import com.commander.xitoy.presentation.orders.OrdersState
+import com.commander.xitoy.presentation.orders.OrdersViewModel
 import com.commander.xitoy.ui.theme.DalliAccent
 import com.commander.xitoy.ui.theme.DalliBackground
 import com.commander.xitoy.ui.theme.DalliError
@@ -105,6 +113,7 @@ private fun getMinOrderLabel(id: Int, soldCount: Int): String =
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
+    ordersViewModel: OrdersViewModel = hiltViewModel(),
     onProductClick: (Product) -> Unit,
     onCartClick: () -> Unit,
     onFavoritesClick: () -> Unit = {},
@@ -119,6 +128,14 @@ fun HomeScreen(
     val errorMessage = viewModel.errorMessage.collectAsState().value
     val favorites = FavoritesManager.favorites.collectAsState().value
     val searchQuery = viewModel.searchQuery.collectAsState().value
+    val session by SessionManager.session.collectAsState()
+    val ordersState by ordersViewModel.state.collectAsState()
+    var quickAddProduct by remember { mutableStateOf<Product?>(null) }
+
+    LaunchedEffect(session?.telegramId) {
+        val tid = session?.telegramId
+        if (!tid.isNullOrBlank()) ordersViewModel.loadOrders(tid)
+    }
 
     LaunchedEffect(pendingCategory) {
         if (!pendingCategory.isNullOrBlank()) {
@@ -126,6 +143,9 @@ fun HomeScreen(
             onCategoryConsumed()
         }
     }
+
+    val latestOrder: OrderItem? = (ordersState as? OrdersState.Success)?.orders?.firstOrNull()
+    val bannerStage = latestOrder?.let { holatToStage(it.holat) } ?: 0
 
     PullToRefreshBox(
         isRefreshing = isLoading,
@@ -148,7 +168,9 @@ fun HomeScreen(
                     Spacer(Modifier.height(2.dp))
                     FlatSearchBar(value = searchQuery, onValueChange = { viewModel.onSearchQueryChange(it) })
                     HeroBanner(onClick = onSalesClick, totalCount = totalCount)
-                    DeliveryBanner(onClick = onOrdersClick)
+                    if (latestOrder != null) {
+                        DeliveryBanner(order = latestOrder, stage = bannerStage, onClick = onOrdersClick)
+                    }
                 }
             }
 
@@ -203,7 +225,12 @@ fun HomeScreen(
                 else -> {
                     items(filteredProducts, key = { it.id }) { product ->
                         val isFav = favorites.any { it.name == product.name }
-                        ProductCard(product = product, isFavorite = isFav, onClick = { onProductClick(product) })
+                        ProductCard(
+                            product = product,
+                            isFavorite = isFav,
+                            onClick = { onProductClick(product) },
+                            onQuickAdd = { quickAddProduct = product }
+                        )
                     }
                 }
             }
@@ -223,10 +250,25 @@ fun HomeScreen(
                     }
                 }
                 items(feed, span = { GridItemSpan(maxLineSpan) }, key = { "feed_${it.id}" }) { product ->
-                    ProductRow(product = product, onClick = { onProductClick(product) })
+                    ProductRow(
+                        product = product,
+                        onClick = { onProductClick(product) },
+                        onQuickAdd = { quickAddProduct = product }
+                    )
                 }
             }
         }
+    }
+
+    quickAddProduct?.let { product ->
+        QuickAddBottomSheet(
+            product = product,
+            onDismiss = { quickAddProduct = null },
+            onAddToCart = { variantName, variantImg, price ->
+                CartManager.addToCart(product, variantName, price, variantImg)
+                quickAddProduct = null
+            }
+        )
     }
 }
 
@@ -395,7 +437,7 @@ private fun HeroBanner(onClick: () -> Unit, totalCount: Int = 0) {
 }
 
 @Composable
-private fun DeliveryBanner(onClick: () -> Unit) {
+private fun DeliveryBanner(order: OrderItem, stage: Int, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -407,21 +449,16 @@ private fun DeliveryBanner(onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Icon(Icons.Default.LocalShipping, null, tint = DeliveryGreen, modifier = Modifier.size(22.dp))
-        Column(modifier = Modifier.weight(1f)) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
-                "DS-24817 · Yo'lda (transport)",
+                "${order.order_id} · ${holatDisplay(order.holat)}",
                 color = Color.White,
                 fontWeight = FontWeight.ExtraBold,
                 fontSize = 13.5.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Text(
-                "Guangzhou → Toshkent · 3–5 kun",
-                color = Color.White.copy(alpha = 0.6f),
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 11.5.sp
-            )
+            OrderProgressBar(stage = stage, modifier = Modifier.fillMaxWidth())
         }
         Icon(
             Icons.AutoMirrored.Filled.KeyboardArrowRight,
@@ -472,7 +509,13 @@ private fun formatSold(n: Int): String =
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProductCard(product: Product, rank: Int? = null, isFavorite: Boolean = false, onClick: () -> Unit) {
+fun ProductCard(
+    product: Product,
+    rank: Int? = null,
+    isFavorite: Boolean = false,
+    onClick: () -> Unit,
+    onQuickAdd: () -> Unit = {}
+) {
     val rankBorderColor = when (rank) {
         1 -> Color(0xFFFFD700)
         2 -> Color(0xFFB0BEC5)
@@ -626,7 +669,7 @@ fun ProductCard(product: Product, rank: Int? = null, isFavorite: Boolean = false
                             .size(34.dp)
                             .clip(RoundedCornerShape(10.dp))
                             .background(DalliPrimary)
-                            .clickable { onClick() },
+                            .clickable { onQuickAdd() },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -749,7 +792,7 @@ private fun PriceText(value: Long, numberSize: TextUnit, somSize: TextUnit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ProductRow(product: Product, onClick: () -> Unit) {
+private fun ProductRow(product: Product, onClick: () -> Unit, onQuickAdd: () -> Unit = {}) {
     Card(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
@@ -805,7 +848,7 @@ private fun ProductRow(product: Product, onClick: () -> Unit) {
                         modifier = Modifier
                             .clip(RoundedCornerShape(10.dp))
                             .background(DalliPrimary)
-                            .clickable { onClick() }
+                            .clickable { onQuickAdd() }
                             .padding(horizontal = 14.dp, vertical = 8.dp),
                         contentAlignment = Alignment.Center
                     ) {
