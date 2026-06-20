@@ -244,7 +244,7 @@ fun HomeScreen(
                             isFavorite = isFav,
                             onClick = { onProductClick(product) },
                             onQuickAdd = {
-                                if (product.allImages.size > 1) {
+                                    if (product.allImages.size > 1 || product.variantlarYoqilgan) {
                                     quickAddProduct = product
                                 } else {
                                     CartManager.addToCart(product, null, product.price, null)
@@ -275,7 +275,7 @@ fun HomeScreen(
                         product = product,
                         onClick = { onProductClick(product) },
                         onQuickAdd = {
-                            if (product.allImages.size > 1) {
+                            if (product.allImages.size > 1 || product.variantlarYoqilgan) {
                                 quickAddProduct = product
                             } else {
                                 CartManager.addToCart(product, null, product.price, null)
