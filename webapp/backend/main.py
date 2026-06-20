@@ -1157,9 +1157,9 @@ async def send_order_to_admin(order_id: str, data: OrderCreate):
     text = (
         f"🛒 Yangi buyurtma!\n\n"
         f"📋 {order_id}\n"
-        f"👤 {data.fullname or ‘—‘}\n"
-        f"📞 {data.phone or ‘—‘}\n"
-        f"📍 {data.location_link or ‘Manzil yo’q’}\n\n"
+        f"👤 {data.fullname or '—'}\n"
+        f"📞 {data.phone or '—'}\n"
+        f"📍 {data.location_link or 'Manzil yo’q'}\n\n"
         f"📦 Mahsulotlar:\n{data.mahsulotlar}\n\n"
         f"💰 Jami: {data.jami_summa:,} so’m".replace(",", " ")
     )
