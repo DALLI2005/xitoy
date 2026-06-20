@@ -129,6 +129,12 @@ function updateProduct(d) {
       sheet.getRange(row, 10).setValue(d.value ? 1 : 0);
     } else if (d.field === "inStock") {
       sheet.getRange(row, 11).setValue(d.value ? 1 : 0);
+    } else if (d.field === "variantlar_yoqilgan") {
+      sheet.getRange(row, 18).setValue(d.value ? 1 : 0);
+    } else if (d.field === "variant_nomlari") {
+      sheet.getRange(row, 19).setValue(JSON.stringify(d.value || []));
+    } else if (d.field === "variant_narxlari") {
+      sheet.getRange(row, 20).setValue(JSON.stringify(d.value || []));
     } else {
       return jsonOut({ ok: false, error: "Noma'lum maydon: " + d.field });
     }
@@ -256,11 +262,14 @@ function editProduct(d) {
   for (var i = 0; i < data.length; i++) {
     if (Number(data[i][0]) !== Number(d.id)) continue;
     var row = i + 1;
-    if (d.name)                   sheet.getRange(row, 2).setValue(d.name);
-    if (d.description)            sheet.getRange(row, 3).setValue(d.description);
-    if (d.price !== undefined)    sheet.getRange(row, 4).setValue(Number(d.price));
-    if (d.category)               sheet.getRange(row, 6).setValue(d.category);
-    if (d.discount !== undefined) sheet.getRange(row, 7).setValue(Number(d.discount) || 0);
+    if (d.name)                              sheet.getRange(row, 2).setValue(d.name);
+    if (d.description)                       sheet.getRange(row, 3).setValue(d.description);
+    if (d.price !== undefined)               sheet.getRange(row, 4).setValue(Number(d.price));
+    if (d.category)                          sheet.getRange(row, 6).setValue(d.category);
+    if (d.discount !== undefined)            sheet.getRange(row, 7).setValue(Number(d.discount) || 0);
+    if (d.variantlar_yoqilgan !== undefined) sheet.getRange(row, 18).setValue(d.variantlar_yoqilgan ? 1 : 0);
+    if (d.variant_nomlari !== undefined)     sheet.getRange(row, 19).setValue(JSON.stringify(d.variant_nomlari || []));
+    if (d.variant_narxlari !== undefined)    sheet.getRange(row, 20).setValue(JSON.stringify(d.variant_narxlari || []));
     return jsonOut({ ok: true });
   }
 

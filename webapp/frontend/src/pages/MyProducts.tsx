@@ -44,6 +44,9 @@ type Filter = 'all' | 'inactive' | 'outofstock'
 
 interface EditForm {
   name: string; price: string; discount: string; category: string; description: string
+  variantlar_yoqilgan: boolean
+  variant_nomlari: string[]
+  variant_narxlari: string[]
 }
 
 export default function MyProducts({ user }: Props) {
@@ -55,7 +58,7 @@ export default function MyProducts({ user }: Props) {
 
   // Edit modal
   const [editProduct, setEditProduct] = useState<Product | null>(null)
-  const [editForm, setEditForm]       = useState<EditForm>({ name: '', price: '', discount: '', category: '', description: '' })
+  const [editForm, setEditForm]       = useState<EditForm>({ name: '', price: '', discount: '', category: '', description: '', variantlar_yoqilgan: false, variant_nomlari: [], variant_narxlari: [] })
   const [editSaving, setEditSaving]   = useState(false)
   const [editError, setEditError]     = useState('')
 
@@ -78,11 +81,14 @@ export default function MyProducts({ user }: Props) {
     setEditProduct(p)
     setEditError('')
     setEditForm({
-      name:        p.title || p.name || '',
-      price:       String(p.price),
-      discount:    String(p.discountPercent || p.discount || 0),
-      category:    p.category || '',
-      description: p.description || '',
+      name:                p.title || p.name || '',
+      price:               String(p.price),
+      discount:            String(p.discountPercent || p.discount || 0),
+      category:            p.category || '',
+      description:         p.description || '',
+      variantlar_yoqilgan: p.variantlarYoqilgan ?? false,
+      variant_nomlari:     p.variantNomlari ?? [],
+      variant_narxlari:    (p.variantNarxlari ?? []).map(String),
     })
   }
 
@@ -94,11 +100,14 @@ export default function MyProducts({ user }: Props) {
     setEditError('')
     try {
       await api.updateProduct(editProduct.id!, {
-        name:        editForm.name.trim(),
-        price:       parseInt(editForm.price),
-        discount:    parseInt(editForm.discount || '0') || 0,
-        category:    editForm.category,
-        description: editForm.description.trim(),
+        name:                editForm.name.trim(),
+        price:               parseInt(editForm.price),
+        discount:            parseInt(editForm.discount || '0') || 0,
+        category:            editForm.category,
+        description:         editForm.description.trim(),
+        variantlar_yoqilgan: editForm.variantlar_yoqilgan,
+        variant_nomlari:     editForm.variant_nomlari,
+        variant_narxlari:    editForm.variant_narxlari.map(s => parseInt(s) || 0),
       })
       setProducts(prev => prev.map(p =>
         p.id == editProduct.id
@@ -389,6 +398,91 @@ export default function MyProducts({ user }: Props) {
                 disabled={editSaving}
               />
             </div>
+
+            {/* Variant toggle */}
+            <div className="flex items-center justify-between py-1">
+              <label className="text-xs font-medium" style={{ color: 'var(--fg-muted)' }}>RASMLAR NARXI FARQ QILADIMI?</label>
+              <button
+                type="button"
+                disabled={editSaving}
+                onClick={() => setEditForm(f => ({
+                  ...f,
+                  variantlar_yoqilgan: !f.variantlar_yoqilgan,
+                  variant_nomlari:  !f.variantlar_yoqilgan && f.variant_nomlari.length === 0 ? [''] : f.variant_nomlari,
+                  variant_narxlari: !f.variantlar_yoqilgan && f.variant_narxlari.length === 0 ? [''] : f.variant_narxlari,
+                }))}
+                className="text-xs px-3 py-1 rounded-lg font-medium cursor-pointer transition-all duration-150"
+                style={{
+                  background: editForm.variantlar_yoqilgan ? 'rgba(99,102,241,0.2)' : 'var(--bg)',
+                  color:      editForm.variantlar_yoqilgan ? 'var(--accent-hover)' : 'var(--fg-muted)',
+                  border:     `1px solid ${editForm.variantlar_yoqilgan ? 'rgba(99,102,241,0.4)' : 'var(--border)'}`,
+                }}
+              >
+                {editForm.variantlar_yoqilgan ? 'Ha ✓' : "Yo'q"}
+              </button>
+            </div>
+
+            {/* Variant qatorlari */}
+            {editForm.variantlar_yoqilgan && (
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-medium" style={{ color: 'var(--fg-muted)' }}>VARIANTLAR (RANG — NARX)</label>
+                {editForm.variant_nomlari.map((nom, idx) => (
+                  <div key={idx} className="flex gap-2 items-center">
+                    <input
+                      className="field flex-1"
+                      placeholder="Rang nomi"
+                      value={nom}
+                      disabled={editSaving}
+                      onChange={e => setEditForm(f => {
+                        const nomlari = [...f.variant_nomlari]
+                        nomlari[idx] = e.target.value
+                        return { ...f, variant_nomlari: nomlari }
+                      })}
+                    />
+                    <input
+                      className="field"
+                      type="number"
+                      inputMode="numeric"
+                      placeholder="Narx"
+                      style={{ width: 90 }}
+                      value={editForm.variant_narxlari[idx] ?? ''}
+                      disabled={editSaving}
+                      onChange={e => setEditForm(f => {
+                        const narxlari = [...f.variant_narxlari]
+                        narxlari[idx] = e.target.value
+                        return { ...f, variant_narxlari: narxlari }
+                      })}
+                    />
+                    <button
+                      type="button"
+                      disabled={editSaving}
+                      onClick={() => setEditForm(f => ({
+                        ...f,
+                        variant_nomlari:  f.variant_nomlari.filter((_, i) => i !== idx),
+                        variant_narxlari: f.variant_narxlari.filter((_, i) => i !== idx),
+                      }))}
+                      className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer flex-shrink-0"
+                      style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  disabled={editSaving}
+                  onClick={() => setEditForm(f => ({
+                    ...f,
+                    variant_nomlari:  [...f.variant_nomlari, ''],
+                    variant_narxlari: [...f.variant_narxlari, ''],
+                  }))}
+                  className="text-xs font-medium py-1.5 rounded-lg cursor-pointer"
+                  style={{ background: 'rgba(99,102,241,0.08)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.2)' }}
+                >
+                  + Variant qo'shish
+                </button>
+              </div>
+            )}
 
             <button
               onClick={saveEdit}

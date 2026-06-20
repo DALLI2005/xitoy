@@ -101,6 +101,9 @@ export const api = {
   updateProduct: (id: number | string, data: {
     name?: string; price?: number; discount?: number
     category?: string; description?: string
+    variantlar_yoqilgan?: boolean
+    variant_nomlari?: string[]
+    variant_narxlari?: number[]
   }) =>
     request(`/products/${id}`, {
       method: 'PUT',

@@ -515,13 +515,16 @@ class ProductPatch(BaseModel):
 
 
 class ProductUpdate(BaseModel):
-    name:        str | None       = None
-    price:       int | None       = None
-    discount:    int | None       = None
-    category:    str | None       = None
-    description: str | None       = None
-    image_url:   str | None       = None
-    images:      list[str] | None = None
+    name:                str | None       = None
+    price:               int | None       = None
+    discount:            int | None       = None
+    category:            str | None       = None
+    description:         str | None       = None
+    image_url:           str | None       = None
+    images:              list[str] | None = None
+    variantlar_yoqilgan: bool | None      = None
+    variant_nomlari:     list[str] | None = None
+    variant_narxlari:    list[int] | None = None
 
 
 # ── Helpers — Google Sheets ────────────────────────────────────────────────────

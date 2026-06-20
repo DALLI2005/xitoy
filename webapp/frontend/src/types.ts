@@ -22,6 +22,9 @@ export interface Product {
   added_by_name?: string
   active?: boolean
   inStock?: boolean
+  variantlarYoqilgan?: boolean
+  variantNomlari?: string[]
+  variantNarxlari?: number[]
 }
 
 export interface Admin {
