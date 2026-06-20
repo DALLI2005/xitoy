@@ -1,0 +1,104 @@
+package com.commander.xitoy.presentation.home
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.commander.xitoy.domain.model.Product
+import com.commander.xitoy.domain.use_case.GetProductsUseCase
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+@HiltViewModel
+class HomeViewModel @Inject constructor(
+    private val getProductsUseCase: GetProductsUseCase
+) : ViewModel() {
+
+    private val _products = MutableStateFlow<List<Product>>(emptyList())
+
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery
+
+    val allProductsCount: StateFlow<Int> = _products
+        .map { it.size }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = 0
+        )
+
+    val filteredProducts: StateFlow<List<Product>> = combine(
+        _products,
+        _searchQuery.debounce(300).onStart { emit("") }
+    ) { products, query ->
+        if (query.isBlank()) products
+        else products.filter { product ->
+            product.name.contains(query, ignoreCase = true) ||
+                    product.category.contains(query, ignoreCase = true)
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = emptyList()
+    )
+
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading
+
+    // Xatoni ushlab, dizaynga uzatish uchun maxsus o'zgaruvchi
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage
+
+    init {
+        fetchProducts()
+        startPolling()
+    }
+
+    fun onSearchQueryChange(query: String) {
+        _searchQuery.value = query
+    }
+
+    fun refresh() {
+        fetchProducts()
+    }
+
+    private fun fetchProducts() {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _errorMessage.value = null
+            try {
+                _products.value = getProductsUseCase()
+            } catch (e: Exception) {
+                _errorMessage.value = e.message ?: "Noma'lum xatolik yuz berdi"
+                e.printStackTrace()
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    private fun startPolling() {
+        viewModelScope.launch {
+            while (true) {
+                delay(30_000L) // 30 soniyada bir yangilash
+                try {
+                    val fresh = getProductsUseCase()
+                    if (fresh != _products.value) {
+                        _products.value = fresh
+                    }
+                    _errorMessage.value = null
+                } catch (_: Exception) {
+                    // polling xatosi jimgina o'tib ketadi
+                }
+            }
+        }
+    }
+}

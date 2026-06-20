@@ -1,0 +1,247 @@
+package com.commander.xitoy.presentation
+
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.core.content.ContextCompat
+import androidx.activity.compose.setContent
+import kotlinx.coroutines.flow.MutableStateFlow
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.activity.viewModels
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.commander.xitoy.domain.model.SelectedProductHolder
+import com.commander.xitoy.domain.model.SessionManager
+import com.commander.xitoy.presentation.details.DetailsScreen
+import com.commander.xitoy.presentation.home.HomeViewModel
+import com.commander.xitoy.presentation.login.LoginScreen
+import com.commander.xitoy.presentation.main.MainScreen
+import com.commander.xitoy.presentation.payment.PaymentScreen
+import com.commander.xitoy.presentation.sales.SalesScreen
+import com.commander.xitoy.ui.theme.XitoyTheme
+import dagger.hilt.android.AndroidEntryPoint
+
+@AndroidEntryPoint
+class MainActivity : ComponentActivity() {
+
+    companion object {
+        // onNewIntent va cold-start ikkalasida ham Compose tomonidan kuzatiladigan holat
+        val pendingRoute = MutableStateFlow<String?>(null)
+    }
+
+    private val homeViewModel: HomeViewModel by viewModels()
+
+    private fun extractRoute(intent: Intent?): String? {
+        // Deep link URI: dalli://product/123 yoki dalli://order/DS-24850
+        intent?.data?.takeIf { it.scheme == "dalli" }?.let { uri ->
+            val id = uri.lastPathSegment ?: return@let
+            return when (uri.host) {
+                "product" -> "product/$id"
+                "order"   -> "order/$id"
+                else      -> null
+            }
+        }
+        // Tab deep link: navigate_to_tab extra (cart, orders...)
+        return intent?.getStringExtra("navigate_to_tab")?.let { "main_screen?tab=$it" }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingRoute.value = extractRoute(intent)
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        requestNotificationPermission()
+        pendingRoute.value = extractRoute(intent)
+        setContent {
+            XitoyTheme {
+                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+
+                    val rootNavController = rememberNavController()
+
+                    NavHost(navController = rootNavController, startDestination = "splash") {
+
+                        composable("splash") {
+                            com.commander.xitoy.presentation.splash.SplashScreen(navController = rootNavController)
+                        }
+
+                        composable(
+                            route = "main_screen?tab={tab}",
+                            arguments = listOf(
+                                navArgument("tab") {
+                                    type = NavType.StringType
+                                    defaultValue = "home"
+                                }
+                            )
+                        ) { backStackEntry ->
+                            val tab = backStackEntry.arguments?.getString("tab") ?: "home"
+                            MainScreen(
+                                rootNavController = rootNavController,
+                                homeViewModel = homeViewModel,
+                                initialTab = tab
+                            )
+                        }
+
+                        composable("login") {
+                            LoginScreen(
+                                onLoginSuccess = {
+                                    rootNavController.navigate("main_screen") {
+                                        popUpTo("login") { inclusive = true }
+                                    }
+                                }
+                            )
+                        }
+
+                        composable("details") {
+                            val product = SelectedProductHolder.product
+                            if (product != null) {
+                                val viewModel: HomeViewModel = hiltViewModel()
+                                val allProducts by viewModel.filteredProducts.collectAsState()
+                                DetailsScreen(
+                                    product = product,
+                                    allProducts = allProducts,
+                                    onBackClick = { rootNavController.popBackStack() },
+                                    onCartClick = {
+                                        rootNavController.navigate("main_screen?tab=cart") {
+                                            popUpTo("main_screen") { inclusive = true }
+                                            launchSingleTop = true
+                                        }
+                                    },
+                                    onProductClick = { sp ->
+                                        SelectedProductHolder.product = sp
+                                        rootNavController.navigate("details")
+                                    }
+                                )
+                            }
+                        }
+
+                        composable("sales") {
+                            SalesScreen(
+                                onProductClick = { product ->
+                                    SelectedProductHolder.product = product
+                                    rootNavController.navigate("details")
+                                },
+                                onBackClick = { rootNavController.popBackStack() }
+                            )
+                        }
+
+                        composable("product/{id}") { backStackEntry ->
+                            val id = backStackEntry.arguments?.getString("id") ?: ""
+                            // Activity-scoped homeViewModel — products allaqachon yuklangan bo'ladi
+                            val products by homeViewModel.filteredProducts.collectAsState()
+
+                            LaunchedEffect(products) {
+                                val product = products.find { it.id.toString() == id }
+                                if (product != null) {
+                                    SelectedProductHolder.product = product
+                                    rootNavController.navigate("details") {
+                                        popUpTo("product/$id") { inclusive = true }
+                                    }
+                                }
+                            }
+
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator()
+                            }
+                        }
+
+                        composable("order/{id}") { backStackEntry ->
+                            val id = backStackEntry.arguments?.getString("id") ?: ""
+                            OrderScreen(
+                                id = id,
+                                onBackClick = { rootNavController.popBackStack() }
+                            )
+                        }
+
+                        composable(
+                            route = "payment/{orderId}/{total}",
+                            arguments = listOf(
+                                navArgument("orderId") { type = NavType.StringType },
+                                navArgument("total")   { type = NavType.StringType }
+                            )
+                        ) { backStackEntry ->
+                            val orderId = backStackEntry.arguments?.getString("orderId") ?: ""
+                            val total   = backStackEntry.arguments?.getString("total")?.toLongOrNull() ?: 0L
+                            val tgId    = SessionManager.session.value?.telegramId ?: ""
+                            PaymentScreen(
+                                orderId       = orderId,
+                                totalSomm     = total,
+                                telegramId    = tgId,
+                                onBack        = { rootNavController.popBackStack() },
+                                onPaymentSent = {
+                                    rootNavController.navigate("main_screen?tab=orders") {
+                                        popUpTo("main_screen") { inclusive = true }
+                                        launchSingleTop = true
+                                    }
+                                }
+                            )
+                        }
+                    }
+
+                }
+            }
+        }
+    }
+
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun OrderScreen(id: String, onBackClick: () -> Unit) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Buyurtma #$id") },
+                navigationIcon = {
+                    IconButton(onClick = onBackClick) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Orqaga")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Box(
+            modifier = Modifier.padding(padding).fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("Buyurtma ID: $id")
+        }
+    }
+}

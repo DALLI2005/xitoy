@@ -1,0 +1,42 @@
+# Secrets
+.env
+*.env
+firebase-service-account.json
+
+# Android build
+app/build/
+build/
+*.apk
+*.aab
+local.properties
+.gradle/
+captures/
+*.hprof
+
+# Android Studio
+.idea/
+*.iml
+.DS_Store
+
+# Frontend
+webapp/frontend/node_modules/
+webapp/frontend/dist/
+
+# Backend
+webapp/backend/venv/
+webapp/backend/__pycache__/
+webapp/backend/*.db
+webapp/backend/*.log
+__pycache__/
+*.pyc
+*.pyo
+
+# Logs
+*.log
+nohup.out
+
+# Firebase & sensitive configs
+app/google-services.json
+
+# Claude IDE settings
+.claude/

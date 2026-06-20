@@ -1,0 +1,15 @@
+[Unit]
+Description=Dalli Shop Login Bot (@dalli_login_robot)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/xitoy_webapp/backend
+EnvironmentFile=/opt/xitoy_webapp/backend/.env
+ExecStart=/opt/xitoy_webapp/backend/venv/bin/python login_bot.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
