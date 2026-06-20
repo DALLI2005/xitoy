@@ -511,6 +511,7 @@ fun DetailsScreen(
                         .background(btnColor)
                         .clickable {
                             if (!added) {
+                                android.util.Log.d("VariantDebug", "addToCart: ${product.name} | variant=$selectedVariantName | price=$activeBasePrice | qty=$quantity")
                                 repeat(quantity) { CartManager.addToCart(product, selectedVariantName, if (product.variantlarYoqilgan) activeBasePrice else null) }
                                 added = true
                                 pressed = true

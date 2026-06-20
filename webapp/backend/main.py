@@ -33,7 +33,7 @@ from fastapi import Depends, FastAPI, File, HTTPException, Header, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 import os
@@ -1099,6 +1099,13 @@ class OrderCreate(BaseModel):
     location_link: str = ""
     mahsulotlar:   str
     jami_summa:    int = 0
+
+    @field_validator("mahsulotlar")
+    @classmethod
+    def mahsulotlar_not_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("mahsulotlar bo'sh bo'lishi mumkin emas")
+        return v
 
 
 class OrderStatusPatch(BaseModel):

@@ -68,6 +68,8 @@ dependencies {
     // Tarmoq so'rovlari va Server API bilan ishlash uchun (Retrofit)
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    // Network logging (Logcat'da so'rovlarni ko'rish uchun)
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
     // VPS dagi tovar rasmlarini Jetpack Compose'da ko'rsatish uchun (Coil)
     implementation("io.coil-kt:coil-compose:2.6.0")

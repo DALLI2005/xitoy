@@ -223,6 +223,7 @@ fun CartScreen(
                                 val suffix = if (item.variantName != null) " (${item.variantName})" else ""
                                 "${item.product.name}$suffix x$q"
                             }
+                            android.util.Log.d("VariantDebug", "Order itemsText: $itemsText")
                             showDialog = false
                             viewModel.placeOrder(
                                 telegramId = session?.telegramId ?: "",
