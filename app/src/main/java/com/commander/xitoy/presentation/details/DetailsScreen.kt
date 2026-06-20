@@ -280,7 +280,7 @@ fun DetailsScreen(
                                     modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp))
                                 )
                             }
-                            if (product.variantlarYoqilgan && i < product.variantNomlari.size) {
+                            if (product.variantlarYoqilgan && i < product.variantNomlari.size && product.variantNomlari[i].isNotBlank()) {
                                 Text(
                                     text = product.variantNomlari[i],
                                     fontSize = 10.sp,

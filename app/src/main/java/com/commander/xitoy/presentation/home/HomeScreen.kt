@@ -1,5 +1,10 @@
 package com.commander.xitoy.presentation.home
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -131,6 +136,14 @@ fun HomeScreen(
     val session by SessionManager.session.collectAsState()
     val ordersState by ordersViewModel.state.collectAsState()
     var quickAddProduct by remember { mutableStateOf<Product?>(null) }
+    var addedProductName by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(addedProductName) {
+        if (addedProductName != null) {
+            delay(1500L)
+            addedProductName = null
+        }
+    }
 
     LaunchedEffect(session?.telegramId) {
         val tid = session?.telegramId
@@ -147,6 +160,7 @@ fun HomeScreen(
     val latestOrder: OrderItem? = (ordersState as? OrdersState.Success)?.orders?.firstOrNull()
     val bannerStage = latestOrder?.let { holatToStage(it.holat) } ?: 0
 
+    Box(modifier = Modifier.fillMaxSize()) {
     PullToRefreshBox(
         isRefreshing = isLoading,
         onRefresh = { viewModel.refresh() },
@@ -229,7 +243,14 @@ fun HomeScreen(
                             product = product,
                             isFavorite = isFav,
                             onClick = { onProductClick(product) },
-                            onQuickAdd = { quickAddProduct = product }
+                            onQuickAdd = {
+                                if (product.allImages.size > 1) {
+                                    quickAddProduct = product
+                                } else {
+                                    CartManager.addToCart(product, null, product.price, null)
+                                    addedProductName = product.name
+                                }
+                            }
                         )
                     }
                 }
@@ -253,12 +274,46 @@ fun HomeScreen(
                     ProductRow(
                         product = product,
                         onClick = { onProductClick(product) },
-                        onQuickAdd = { quickAddProduct = product }
+                        onQuickAdd = {
+                            if (product.allImages.size > 1) {
+                                quickAddProduct = product
+                            } else {
+                                CartManager.addToCart(product, null, product.price, null)
+                                addedProductName = product.name
+                            }
+                        }
                     )
                 }
             }
         }
     }
+
+    AnimatedVisibility(
+        visible = addedProductName != null,
+        enter = slideInVertically { it / 2 } + fadeIn(),
+        exit  = slideOutVertically { it / 2 } + fadeOut(),
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .padding(bottom = 120.dp, start = 24.dp, end = 24.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(14.dp))
+                .background(DalliText)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(Lucide.CircleCheck, null, tint = DeliveryGreen, modifier = Modifier.size(16.dp))
+            Text(
+                "Savatga qo'shildi",
+                color = Color.White,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 13.sp
+            )
+        }
+    }
+    } // Box end
 
     quickAddProduct?.let { product ->
         QuickAddBottomSheet(

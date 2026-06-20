@@ -192,8 +192,15 @@ export default function AddProduct({ user }: Props) {
         auto_delete:      discountType === 'temporary' && autoDelete,
         send_push:        sendPush && discountNum > 0,
         variantlar_yoqilgan: variantEnabled,
-        variant_nomlari:     variantEnabled ? variantNames.slice(0, photos.length) : [],
-        variant_narxlari:    variantEnabled ? variantPrices.slice(0, photos.length).map(p => parseInt(p) || 0) : [],
+        variant_nomlari:     variantEnabled
+          ? photos.map((_, i) => variantNames[i]?.trim() ?? '')
+          : [],
+        variant_narxlari:    variantEnabled
+          ? photos.map((_, i) => {
+              const p = parseInt(variantPrices[i] || '0')
+              return p > 0 ? p : finalPrice
+            })
+          : [],
       })
       hapticSuccess()
 
