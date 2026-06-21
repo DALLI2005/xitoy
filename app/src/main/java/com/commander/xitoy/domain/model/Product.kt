@@ -48,6 +48,9 @@ data class Product(
 
     @SerializedName("variantNarxlari")
     val variantNarxlari: List<Double> = emptyList(),
+
+    @SerializedName("razmerMatritsa")
+    val razmerMatritsa: Map<String, List<SizeOption>> = emptyMap(),
 ) {
     // Barcha rasmlar: images mavjud bo'lsa ularni, yo'qsa imageUrl ni qaytaradi
     val allImages: List<String>

@@ -63,6 +63,8 @@ import coil.compose.AsyncImage
 import com.commander.xitoy.domain.model.CartManager
 import com.commander.xitoy.domain.model.FavoritesManager
 import com.commander.xitoy.domain.model.Product
+import com.commander.xitoy.presentation.common.rememberHaptic
+import com.commander.xitoy.presentation.common.rememberStrongHaptic
 import com.commander.xitoy.presentation.home.ProductCard
 import com.commander.xitoy.ui.theme.DalliAccent
 import com.commander.xitoy.ui.theme.DalliBackground
@@ -110,10 +112,16 @@ fun DetailsScreen(
     val images = product.allImages
     var activeImg by remember(product.id) { mutableIntStateOf(0) }
 
+    // Size support
+    val availableSizes = product.razmerMatritsa[activeImg.toString()] ?: emptyList()
+    var selectedSize by remember(product.id, activeImg) { mutableStateOf<com.commander.xitoy.domain.model.SizeOption?>(null) }
+
     // Variant support
-    val activeBasePrice = if (product.variantlarYoqilgan && activeImg < product.variantNarxlari.size) {
-        product.variantNarxlari[activeImg]
-    } else product.price
+    val activeBasePrice = when {
+        selectedSize != null -> selectedSize!!.narx
+        product.variantlarYoqilgan && activeImg < product.variantNarxlari.size -> product.variantNarxlari[activeImg]
+        else -> product.price
+    }
     val selectedVariantName: String? = if (product.variantlarYoqilgan) product.variantNomlari.getOrNull(activeImg) else null
 
     var quantity by remember(product.id) { mutableIntStateOf(1) }
@@ -123,6 +131,7 @@ fun DetailsScreen(
     val isFavorite = favorites.any { it.name == product.name }
     val cartCount = CartManager.cartItems.collectAsState().value.size
 
+    val canAddToCart = availableSizes.isEmpty() || selectedSize != null
     val finalPrice = (activeBasePrice * (100 - product.discountPercent) / 100).toLong()
     val isHot = product.soldCount >= 100
     val totalPrice = finalPrice * quantity
@@ -161,6 +170,9 @@ fun DetailsScreen(
 
     val displayRating = if (product.rating > 0f) product.rating else 3.5f + (product.id % 15) * 0.1f
     val ratingText = String.format("%.1f", displayRating)
+
+    val haptic = rememberStrongHaptic()
+    val favHaptic = rememberHaptic()
 
     Box(modifier = Modifier.fillMaxSize().background(DalliBackground)) {
 
@@ -213,7 +225,7 @@ fun DetailsScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         RoundBtn(
                             icon = Lucide.Heart,
-                            onClick = { FavoritesManager.toggle(product) },
+                            onClick = { favHaptic(); FavoritesManager.toggle(product) },
                             tint = if (isFavorite) DalliAccent else DalliText
                         )
                         RoundBtn(
@@ -288,6 +300,70 @@ fun DetailsScreen(
                                     color = if (selected) DalliPrimary else DalliMuted,
                                     maxLines = 1,
                                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ─── Razmer tanlash ───────────────────────────────────────────────
+            if (availableSizes.isNotEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .padding(top = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        "O'lcham",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = DalliText
+                    )
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        availableSizes.forEach { size ->
+                            val isSelected = selectedSize?.nomi == size.nomi
+                            val chipBg by animateColorAsState(
+                                targetValue = if (isSelected) DalliPrimary else DalliSurface,
+                                animationSpec = tween(180),
+                                label = "chip_bg"
+                            )
+                            val chipText by animateColorAsState(
+                                targetValue = if (isSelected) Color.White else DalliText,
+                                animationSpec = tween(180),
+                                label = "chip_text"
+                            )
+                            Column(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(chipBg)
+                                    .border(
+                                        width = if (isSelected) 0.dp else 1.dp,
+                                        color = DalliLine,
+                                        shape = RoundedCornerShape(10.dp)
+                                    )
+                                    .clickable { selectedSize = if (isSelected) null else size }
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Text(
+                                    text = size.nomi,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = chipText
+                                )
+                                val sizeDiscountedPrice = (size.narx * (100 - product.discountPercent) / 100).toLong()
+                                Text(
+                                    text = "${groupSom(sizeDiscountedPrice)} so'm",
+                                    fontSize = 10.5.sp,
+                                    fontWeight = FontWeight.Normal,
+                                    color = if (isSelected) Color.White.copy(alpha = 0.85f) else DalliMuted
                                 )
                             }
                         }
@@ -457,11 +533,26 @@ fun DetailsScreen(
             shadowElevation = 24.dp,
             color = DalliSurface
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+            ) {
+            if (!canAddToCart) {
+                Text(
+                    text = "Iltimos, o'lchamni tanlang",
+                    fontSize = 12.sp,
+                    color = DalliMuted,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                )
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .navigationBarsPadding(),
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -508,11 +599,24 @@ fun DetailsScreen(
                         .height(52.dp)
                         .scale(btnScale)
                         .clip(RoundedCornerShape(14.dp))
-                        .background(btnColor)
+                        .background(if (canAddToCart) btnColor else DalliMuted.copy(alpha = 0.35f))
                         .clickable {
-                            if (!added) {
-                                android.util.Log.d("VariantDebug", "addToCart: ${product.name} | variant=$selectedVariantName | price=$activeBasePrice | qty=$quantity")
-                                repeat(quantity) { CartManager.addToCart(product, selectedVariantName, if (product.variantlarYoqilgan) activeBasePrice else null, images.getOrNull(activeImg) ?: product.imageUrl) }
+                            if (!added && canAddToCart) {
+                                haptic()
+                                val priceOverride = when {
+                                    selectedSize != null -> selectedSize!!.narx
+                                    product.variantlarYoqilgan -> activeBasePrice
+                                    else -> null
+                                }
+                                repeat(quantity) {
+                                    CartManager.addToCart(
+                                        product,
+                                        selectedVariantName,
+                                        priceOverride,
+                                        images.getOrNull(activeImg) ?: product.imageUrl,
+                                        selectedSize?.nomi
+                                    )
+                                }
                                 added = true
                                 pressed = true
                             }
@@ -556,6 +660,7 @@ fun DetailsScreen(
                     }
                 }
             }
+            } // Column end
         }
     }
 }

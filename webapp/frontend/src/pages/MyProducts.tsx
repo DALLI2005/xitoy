@@ -61,6 +61,27 @@ export default function MyProducts({ user }: Props) {
   const [editForm, setEditForm]       = useState<EditForm>({ name: '', price: '', discount: '', category: '', description: '', variantlar_yoqilgan: false, variant_nomlari: [], variant_narxlari: [] })
   const [editSaving, setEditSaving]   = useState(false)
   const [editError, setEditError]     = useState('')
+  const [sizesByColor, setSizesByColor] = useState<Record<number, {nomi: string, narx: string}[]>>({})
+
+  function addSize(colorIndex: number) {
+    setSizesByColor(prev => ({
+      ...prev,
+      [colorIndex]: [...(prev[colorIndex] || []), { nomi: '', narx: '' }]
+    }))
+  }
+  function updateSize(colorIndex: number, sizeIndex: number, field: 'nomi' | 'narx', value: string) {
+    setSizesByColor(prev => {
+      const updated = [...(prev[colorIndex] || [])]
+      updated[sizeIndex] = { ...updated[sizeIndex], [field]: value }
+      return { ...prev, [colorIndex]: updated }
+    })
+  }
+  function removeSize(colorIndex: number, sizeIndex: number) {
+    setSizesByColor(prev => ({
+      ...prev,
+      [colorIndex]: (prev[colorIndex] || []).filter((_, i) => i !== sizeIndex)
+    }))
+  }
 
   // Delete confirm
   const [deleteId, setDeleteId]       = useState<number | string | null>(null)
@@ -90,6 +111,14 @@ export default function MyProducts({ user }: Props) {
       variant_nomlari:     p.variantNomlari ?? [],
       variant_narxlari:    (p.variantNarxlari ?? []).map(String),
     })
+    const loadedSizes: Record<number, {nomi: string, narx: string}[]> = {}
+    Object.entries(p.razmerMatritsa || {}).forEach(([idx, sizes]) => {
+      loadedSizes[parseInt(idx)] = (sizes as any[]).map((s: any) => ({
+        nomi: s.nomi,
+        narx: String(s.narx)
+      }))
+    })
+    setSizesByColor(loadedSizes)
   }
 
   async function saveEdit() {
@@ -98,27 +127,42 @@ export default function MyProducts({ user }: Props) {
     if (!editForm.price)       { setEditError('Narx kiritilmagan'); return }
     setEditSaving(true)
     setEditError('')
+
+    const basePrice = parseInt(editForm.price) || 0
+    const razmerMatritsa: Record<string, {nomi: string, narx: number}[]> = {}
+    Object.entries(sizesByColor).forEach(([colorIdx, sizes]) => {
+      const validSizes = sizes.filter(s => s.nomi.trim())
+      if (validSizes.length > 0) {
+        razmerMatritsa[colorIdx] = validSizes.map(s => ({
+          nomi: s.nomi.trim(),
+          narx: parseInt(s.narx) || basePrice
+        }))
+      }
+    })
+
     try {
       await api.updateProduct(editProduct.id!, {
         name:                editForm.name.trim(),
-        price:               parseInt(editForm.price),
+        price:               basePrice,
         discount:            parseInt(editForm.discount || '0') || 0,
         category:            editForm.category,
         description:         editForm.description.trim(),
         variantlar_yoqilgan: editForm.variantlar_yoqilgan,
         variant_nomlari:     editForm.variant_nomlari,
         variant_narxlari:    editForm.variant_narxlari.map(s => parseInt(s) || 0),
+        razmer_matritsa:     editForm.variantlar_yoqilgan ? razmerMatritsa : {},
       })
       setProducts(prev => prev.map(p =>
         p.id == editProduct.id
           ? { ...p, title: editForm.name.trim(), name: editForm.name.trim(),
-              price: parseInt(editForm.price),
+              price: basePrice,
               discountPercent: parseInt(editForm.discount || '0') || 0,
               category: editForm.category,
               description: editForm.description.trim() }
           : p
       ))
       setEditProduct(null)
+      setSizesByColor({})
     } catch (e: any) {
       setEditError(e.message)
     } finally {
@@ -305,7 +349,7 @@ export default function MyProducts({ user }: Props) {
         <div
           className="fixed inset-0 z-50 flex items-end justify-center"
           style={{ background: 'rgba(0,0,0,0.55)' }}
-          onClick={() => !editSaving && setEditProduct(null)}
+          onClick={() => { if (!editSaving) { setEditProduct(null); setSizesByColor({}) } }}
         >
           <div
             className="w-full max-w-sm rounded-t-3xl p-5 flex flex-col gap-3 overflow-y-auto"
@@ -314,7 +358,7 @@ export default function MyProducts({ user }: Props) {
           >
             <div className="flex items-center justify-between mb-1">
               <p className="font-semibold" style={{ color: 'var(--fg)' }}>Tovarni tahrirlash</p>
-              <button onClick={() => setEditProduct(null)} style={{ color: 'var(--fg-muted)' }}>
+              <button onClick={() => { setEditProduct(null); setSizesByColor({}) }} style={{ color: 'var(--fg-muted)' }}>
                 <X size={18} />
               </button>
             </div>
@@ -481,6 +525,66 @@ export default function MyProducts({ user }: Props) {
                 >
                   + Variant qo'shish
                 </button>
+              </div>
+            )}
+
+            {/* Razmer qatorlari — har bir rang uchun */}
+            {editForm.variantlar_yoqilgan && editForm.variant_nomlari.length > 0 && (
+              <div className="flex flex-col gap-3">
+                <label className="text-xs font-medium" style={{ color: 'var(--fg-muted)' }}>RAZMERLAR (RANG BO'YICHA, IXTIYORIY)</label>
+                {editForm.variant_nomlari.map((nom, colorIndex) => (
+                  <div
+                    key={colorIndex}
+                    style={{ paddingLeft: 10, borderLeft: '2px solid var(--border)' }}
+                  >
+                    <p className="text-xs mb-2" style={{ color: 'var(--fg-muted)' }}>
+                      <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
+                        {nom?.trim() || `Rang ${colorIndex + 1}`}
+                      </span>
+                      {' '}uchun razmerlar:
+                    </p>
+                    {(sizesByColor[colorIndex] || []).map((size, sizeIndex) => (
+                      <div key={sizeIndex} className="flex gap-2 mb-2 items-center">
+                        <input
+                          className="field flex-1"
+                          placeholder="Razmer (S, M, L…)"
+                          value={size.nomi}
+                          onChange={e => updateSize(colorIndex, sizeIndex, 'nomi', e.target.value)}
+                          disabled={editSaving}
+                          autoComplete="off"
+                        />
+                        <input
+                          className="field"
+                          type="number"
+                          inputMode="numeric"
+                          placeholder="Narxi"
+                          value={size.narx}
+                          onChange={e => updateSize(colorIndex, sizeIndex, 'narx', e.target.value)}
+                          disabled={editSaving}
+                          style={{ width: 90 }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeSize(colorIndex, sizeIndex)}
+                          disabled={editSaving}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer flex-shrink-0"
+                          style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)', fontSize: 13 }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => addSize(colorIndex)}
+                      disabled={editSaving}
+                      className="text-xs font-medium py-1 px-2.5 rounded-lg cursor-pointer"
+                      style={{ background: 'rgba(99,102,241,0.08)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.2)' }}
+                    >
+                      + Razmer qo'shish
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
 

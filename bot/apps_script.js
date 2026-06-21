@@ -19,6 +19,11 @@ function safeParseArray(val) {
   try { return JSON.parse(String(val)); } catch(_) { return []; }
 }
 
+function safeParseObject(val) {
+  if (!val) return {};
+  try { return JSON.parse(String(val)); } catch(_) { return {}; }
+}
+
 function doGet(e) {
   if (e.parameter.action === "getUserOrders" && e.parameter.telegram_id) {
     return jsonOut(getUserOrders(e.parameter.telegram_id));
@@ -63,6 +68,7 @@ function getProducts() {
       variantlarYoqilgan:  toBool(r[17], false),
       variantNomlari:      safeParseArray(r[18]),
       variantNarxlari:     safeParseArray(r[19]).map(Number),
+      razmerMatritsa:      safeParseObject(r[20]),
     });
   }
   return jsonOut(products);
@@ -135,6 +141,8 @@ function updateProduct(d) {
       sheet.getRange(row, 19).setValue(JSON.stringify(d.value || []));
     } else if (d.field === "variant_narxlari") {
       sheet.getRange(row, 20).setValue(JSON.stringify(d.value || []));
+    } else if (d.field === "razmer_matritsa") {
+      sheet.getRange(row, 21).setValue(JSON.stringify(d.value || {}));
     } else {
       return jsonOut({ ok: false, error: "Noma'lum maydon: " + d.field });
     }
@@ -236,7 +244,8 @@ function saveProduct(d) {
     Number(d.rating) || 0,            // 16: rating
     d.variantlar_yoqilgan ? 1 : 0,    // 17: variantlar_yoqilgan
     JSON.stringify(d.variant_nomlari || []),   // 18: variant_nomlari
-    JSON.stringify(d.variant_narxlari || [])   // 19: variant_narxlari
+    JSON.stringify(d.variant_narxlari || []),  // 19: variant_narxlari
+    JSON.stringify(d.razmer_matritsa || {})    // 20: razmerMatritsa
   ]);
 
   return jsonOut({ ok: true, id: rows });
@@ -270,6 +279,7 @@ function editProduct(d) {
     if (d.variantlar_yoqilgan !== undefined) sheet.getRange(row, 18).setValue(d.variantlar_yoqilgan ? 1 : 0);
     if (d.variant_nomlari !== undefined)     sheet.getRange(row, 19).setValue(JSON.stringify(d.variant_nomlari || []));
     if (d.variant_narxlari !== undefined)    sheet.getRange(row, 20).setValue(JSON.stringify(d.variant_narxlari || []));
+    if (d.razmer_matritsa !== undefined)     sheet.getRange(row, 21).setValue(JSON.stringify(d.razmer_matritsa || {}));
     return jsonOut({ ok: true });
   }
 

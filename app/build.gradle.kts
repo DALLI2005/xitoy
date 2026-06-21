@@ -78,6 +78,9 @@ dependencies {
     // Arxitektura uchun ViewModel va State boshqaruvi
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
 
+    // Lottie animatsiyalari (onboarding uchun)
+    implementation("com.airbnb.android:lottie-compose:6.4.0")
+
     // Android va Compose'ning standart kutubxonalari
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)

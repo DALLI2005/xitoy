@@ -598,6 +598,7 @@ class ProductIn(BaseModel):
     variantlar_yoqilgan: bool = False
     variant_nomlari: list[str] = []
     variant_narxlari: list[int] = []
+    razmer_matritsa: dict | None = None
 
 
 class AdminIn(BaseModel):
@@ -628,6 +629,7 @@ class ProductUpdate(BaseModel):
     variantlar_yoqilgan: bool | None      = None
     variant_nomlari:     list[str] | None = None
     variant_narxlari:    list[int] | None = None
+    razmer_matritsa:     dict | None      = None
 
 
 # ── Helpers — Google Sheets ────────────────────────────────────────────────────
@@ -992,6 +994,7 @@ async def add_product(product: ProductIn, user: dict = Depends(get_current_user)
         "variantlar_yoqilgan": product.variantlar_yoqilgan,
         "variant_nomlari":     product.variant_nomlari,
         "variant_narxlari":    product.variant_narxlari,
+        "razmer_matritsa":     product.razmer_matritsa or {},
     }
 
     is_temporary = (product.discount > 0 and product.discount_type == "vaqtinchalik")
@@ -1201,6 +1204,7 @@ async def get_stats(_: dict = Depends(require_super)):
 class OrderItemDetail(BaseModel):
     nomi:    str
     variant: str | None = None
+    razmer:  str | None = None
     soni:    int        = 1
     narx:    int        = 0
     rasm:    str | None = None
@@ -1282,6 +1286,8 @@ async def send_order_to_admin(order_id: str, data: OrderCreate):
             ]
             if item.variant:
                 lines.append(f"\U0001f3a8 Rangi: {item.variant}")
+            if item.razmer:
+                lines.append(f"\U0001f4cf O‘lchami: {item.razmer}")
             lines.append(f"\U0001f522 Soni: {item.soni} ta")
             lines.append(f"\U0001f4b5 Narxi: {narx_fmt} so{apostr}m")
             caption = "\n".join(lines)

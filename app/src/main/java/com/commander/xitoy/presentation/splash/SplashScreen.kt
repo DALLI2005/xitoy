@@ -17,13 +17,16 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavController
 import com.commander.xitoy.R
+import com.commander.xitoy.domain.model.OnboardingManager
 import com.commander.xitoy.domain.model.SessionManager
 import kotlinx.coroutines.delay
 
 @Composable
 fun SplashScreen(navController: NavController) {
+    val context = LocalContext.current
     var startAnimation by remember { mutableStateOf(false) }
 
     val alphaAnim = animateFloatAsState(
@@ -42,8 +45,11 @@ fun SplashScreen(navController: NavController) {
         startAnimation = true
         delay(1200)
 
-        // Login darvozasi: tizimga kirgan bo'lsa — Home, aks holda — Login
-        val destination = if (SessionManager.isLoggedIn) "main_screen" else "login"
+        val destination = when {
+            SessionManager.isLoggedIn -> "main_screen"
+            OnboardingManager.hasCompletedOnboardingOnce(context) -> "login"
+            else -> "onboarding"
+        }
         navController.navigate(destination) {
             popUpTo("splash") { inclusive = true }
         }

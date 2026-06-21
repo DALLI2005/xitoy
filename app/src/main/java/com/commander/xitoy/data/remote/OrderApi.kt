@@ -11,6 +11,7 @@ import retrofit2.http.Query
 data class OrderItemDetail(
     val nomi: String,
     val variant: String? = null,
+    val razmer: String? = null,
     val soni: Int,
     val narx: Long,
     val rasm: String? = null

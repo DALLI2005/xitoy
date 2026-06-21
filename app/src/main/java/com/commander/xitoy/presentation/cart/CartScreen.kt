@@ -64,6 +64,8 @@ import com.commander.xitoy.domain.model.CartItem
 import com.commander.xitoy.domain.model.CartManager
 import com.commander.xitoy.domain.model.Product
 import com.commander.xitoy.domain.model.SessionManager
+import com.commander.xitoy.presentation.common.rememberHaptic
+import com.commander.xitoy.presentation.common.rememberStrongHaptic
 import com.commander.xitoy.ui.theme.DalliBackground
 import com.commander.xitoy.ui.theme.DalliLine
 import com.commander.xitoy.ui.theme.DalliMuted
@@ -88,7 +90,7 @@ fun CartScreen(
 
     val cartItems = CartManager.cartItems.collectAsState().value
     val groupedItems = remember(cartItems) {
-        cartItems.groupBy { "${it.product.name}|${it.variantName}" }
+        cartItems.groupBy { "${it.product.name}|${it.variantName}|${it.sizeName}" }
             .entries.map { (_, items) -> items.first() to items.size }
     }
     val totalPrice = cartItems.sumOf { it.effectivePrice * (100 - it.product.discountPercent) / 100.0 }
@@ -152,11 +154,11 @@ fun CartScreen(
                     verticalArrangement = Arrangement.spacedBy(11.dp),
                     contentPadding = PaddingValues(bottom = 200.dp)
                 ) {
-                    items(groupedItems, key = { "${it.first.product.name}|${it.first.variantName}" }) { (item, quantity) ->
+                    items(groupedItems, key = { "${it.first.product.name}|${it.first.variantName}|${it.first.sizeName}" }) { (item, quantity) ->
                         CartItemCard(
                             item = item,
                             quantity = quantity,
-                            onIncrement = { CartManager.addToCart(item.product, item.variantName, item.effectivePrice, item.variantImageUrl) },
+                            onIncrement = { CartManager.addToCart(item.product, item.variantName, item.effectivePrice, item.variantImageUrl, item.sizeName) },
                             onDecrement = { CartManager.removeFromCart(item) },
                             onRemoveAll = { CartManager.removeAllOf(item) }
                         )
@@ -226,13 +228,15 @@ fun CartScreen(
                     onClick = {
                         if (name.isNotBlank() && phone.length >= 13) {
                             val itemsText = groupedItems.joinToString(", ") { (item, q) ->
-                                val suffix = if (item.variantName != null) " (${item.variantName})" else ""
+                                val parts = listOfNotNull(item.variantName, item.sizeName)
+                                val suffix = if (parts.isNotEmpty()) " (${parts.joinToString(", ")})" else ""
                                 "${item.product.name}$suffix x$q"
                             }
                             val royxat = groupedItems.map { (item, q) ->
                                 OrderItemDetail(
                                     nomi    = item.product.name,
                                     variant = item.variantName,
+                                    razmer  = item.sizeName,
                                     soni    = q,
                                     narx    = item.effectivePrice.toLong(),
                                     rasm    = item.variantImageUrl ?: item.product.imageUrl
@@ -472,6 +476,14 @@ private fun CartItemCard(
                         color = DalliPrimary
                     )
                 }
+                if (item.sizeName != null) {
+                    Text(
+                        text = "O'lchami: ${item.sizeName}",
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = DalliPrimary
+                    )
+                }
                 Text(
                     text = "${groupSom(itemPrice)} so'm / dona",
                     fontSize = 12.sp,
@@ -516,6 +528,7 @@ private fun QuantityStepper(
     onDecrement: () -> Unit,
     onIncrement: () -> Unit
 ) {
+    val haptic = rememberHaptic()
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -526,7 +539,7 @@ private fun QuantityStepper(
             modifier = Modifier
                 .size(32.dp)
                 .background(DalliBackground)
-                .clickable { onDecrement() },
+                .clickable { haptic(); onDecrement() },
             contentAlignment = Alignment.Center
         ) {
             Text(text = "−", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = DalliTextSecondary)
@@ -545,7 +558,7 @@ private fun QuantityStepper(
             modifier = Modifier
                 .size(32.dp)
                 .background(DalliBackground)
-                .clickable { onIncrement() },
+                .clickable { haptic(); onIncrement() },
             contentAlignment = Alignment.Center
         ) {
             Text(text = "+", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = DalliTextSecondary)
@@ -564,6 +577,7 @@ private fun OrderSummary(
     onOrderClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val orderHaptic = rememberStrongHaptic()
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
@@ -621,7 +635,7 @@ private fun OrderSummary(
             }
             Spacer(modifier = Modifier.height(14.dp))
             Button(
-                onClick = onOrderClick,
+                onClick = { orderHaptic(); onOrderClick() },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),

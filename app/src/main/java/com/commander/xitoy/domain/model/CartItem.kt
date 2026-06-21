@@ -4,5 +4,6 @@ data class CartItem(
     val product: Product,
     val variantName: String? = null,
     val effectivePrice: Double = product.price,
-    val variantImageUrl: String? = null
+    val variantImageUrl: String? = null,
+    val sizeName: String? = null
 )

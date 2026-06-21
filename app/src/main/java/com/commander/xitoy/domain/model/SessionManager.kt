@@ -29,11 +29,13 @@ object SessionManager {
     private const val KEY_ADDRESS = "address"
 
     private var prefs: SharedPreferences? = null
+    private var appContext: Context? = null
 
     private val _session = MutableStateFlow<UserSession?>(null)
     val session: StateFlow<UserSession?> = _session.asStateFlow()
 
     fun init(context: Context) {
+        appContext = context.applicationContext
         val p = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         prefs = p
         if (p.getBoolean(KEY_LOGGED_IN, false)) {
@@ -70,6 +72,7 @@ object SessionManager {
             e.apply()
         }
         _session.value = UserSession(telegramId, ism, username, fullname, phone, address)
+        appContext?.let { OnboardingManager.markCompletedOnce(it) }
     }
 
     fun logout() {

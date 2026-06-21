@@ -78,6 +78,7 @@ export default function AddProduct({ user }: Props) {
   const [variantEnabled, setVariantEnabled]   = useState(false)
   const [variantNames,   setVariantNames]     = useState<string[]>([])
   const [variantPrices,  setVariantPrices]    = useState<string[]>([])
+  const [sizesByColor,   setSizesByColor]     = useState<Record<number, {nomi: string, narx: string}[]>>({})
   const [translating,    setTranslating]      = useState(false)
   const toastTimer                    = useRef<ReturnType<typeof setTimeout>>()
 
@@ -143,6 +144,26 @@ export default function AddProduct({ user }: Props) {
     setForm(f => ({ ...f, [field]: value }))
   }
 
+  function addSize(colorIndex: number) {
+    setSizesByColor(prev => ({
+      ...prev,
+      [colorIndex]: [...(prev[colorIndex] || []), { nomi: '', narx: '' }]
+    }))
+  }
+  function updateSize(colorIndex: number, sizeIndex: number, field: 'nomi' | 'narx', value: string) {
+    setSizesByColor(prev => {
+      const updated = [...(prev[colorIndex] || [])]
+      updated[sizeIndex] = { ...updated[sizeIndex], [field]: value }
+      return { ...prev, [colorIndex]: updated }
+    })
+  }
+  function removeSize(colorIndex: number, sizeIndex: number) {
+    setSizesByColor(prev => ({
+      ...prev,
+      [colorIndex]: (prev[colorIndex] || []).filter((_, i) => i !== sizeIndex)
+    }))
+  }
+
   const yuanNum  = parseFloat(form.yuan) || 0
   const config   = getConfig(form.category)
   const breakdown = (yuanNum > 0 && cnyRate && form.category)
@@ -183,6 +204,17 @@ export default function AddProduct({ user }: Props) {
 
     const finalPrice = calcBreakdown(yuanNum, cnyRate, config).finalPrice
 
+    const razmerMatritsa: Record<string, {nomi: string, narx: number}[]> = {}
+    Object.entries(sizesByColor).forEach(([colorIdx, sizes]) => {
+      const validSizes = sizes.filter(s => s.nomi.trim())
+      if (validSizes.length > 0) {
+        razmerMatritsa[colorIdx] = validSizes.map(s => ({
+          nomi: s.nomi.trim(),
+          narx: parseInt(s.narx) || finalPrice
+        }))
+      }
+    })
+
     const actualMinutes = selectedOption === -1 ? (parseInt(customMinutes) || 0) : (selectedOption || 0)
     const UZB_OFFSET    = 5 * 60 * 60 * 1000
     const discountExpiresAt = (discountNum > 0 && discountType === 'temporary' && actualMinutes > 0)
@@ -216,6 +248,7 @@ export default function AddProduct({ user }: Props) {
               return p > 0 ? p : finalPrice
             })
           : [],
+        razmer_matritsa:     variantEnabled ? razmerMatritsa : {},
       })
       hapticSuccess()
 
@@ -233,6 +266,7 @@ export default function AddProduct({ user }: Props) {
       setVariantEnabled(false)
       setVariantNames([])
       setVariantPrices([])
+      setSizesByColor({})
     } catch (e: any) {
       hapticError()
       showToast('error', e.message || 'Xatolik yuz berdi')
@@ -352,6 +386,70 @@ export default function AddProduct({ user }: Props) {
                     />
                     <span className="text-xs flex-shrink-0" style={{ color: 'var(--fg-muted)' }}>so'm</span>
                   </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Per-color size inputs */}
+          {variantEnabled && photos.length > 0 && (
+            <div className="flex flex-col gap-3 mt-3">
+              {photos.map((_, colorIndex) => (
+                <div
+                  key={colorIndex}
+                  style={{
+                    paddingLeft: 12,
+                    borderLeft: '2px solid var(--border)',
+                  }}
+                >
+                  <p className="text-xs mb-2" style={{ color: 'var(--fg-muted)' }}>
+                    <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
+                      {variantNames[colorIndex]?.trim() || `Rang ${colorIndex + 1}`}
+                    </span>
+                    {' '}uchun razmerlar{' '}
+                    <span style={{ opacity: 0.6 }}>(ixtiyoriy)</span>
+                  </p>
+                  {(sizesByColor[colorIndex] || []).map((size, sizeIndex) => (
+                    <div key={sizeIndex} className="flex gap-2 mb-2 items-center">
+                      <input
+                        className="field flex-1"
+                        placeholder="Razmer (S, M, L, XL…)"
+                        value={size.nomi}
+                        onChange={e => updateSize(colorIndex, sizeIndex, 'nomi', e.target.value)}
+                        disabled={loading}
+                        autoComplete="off"
+                      />
+                      <input
+                        className="field"
+                        type="number"
+                        inputMode="numeric"
+                        placeholder="Narxi"
+                        value={size.narx}
+                        onChange={e => updateSize(colorIndex, sizeIndex, 'narx', e.target.value)}
+                        disabled={loading}
+                        style={{ width: 110 }}
+                      />
+                      <span className="text-xs flex-shrink-0" style={{ color: 'var(--fg-muted)' }}>so'm</span>
+                      <button
+                        type="button"
+                        onClick={() => removeSize(colorIndex, sizeIndex)}
+                        disabled={loading}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer flex-shrink-0"
+                        style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)', fontSize: 14 }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => addSize(colorIndex)}
+                    disabled={loading}
+                    className="text-xs font-medium py-1 px-3 rounded-lg cursor-pointer"
+                    style={{ background: 'rgba(99,102,241,0.08)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.2)' }}
+                  >
+                    + Razmer qo'shish
+                  </button>
                 </div>
               ))}
             </div>

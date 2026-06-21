@@ -25,6 +25,7 @@ export interface Product {
   variantlarYoqilgan?: boolean
   variantNomlari?: string[]
   variantNarxlari?: number[]
+  razmerMatritsa?: Record<string, { nomi: string; narx: number }[]>
 }
 
 export interface Admin {

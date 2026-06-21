@@ -27,14 +27,22 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import com.commander.xitoy.presentation.common.rememberStrongHaptic
+import kotlinx.coroutines.delay
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -77,6 +85,17 @@ fun QuickAddBottomSheet(
     val selectedVariantName = if (product.variantlarYoqilgan) {
         product.variantNomlari.getOrNull(selectedVariant)
     } else null
+
+    val haptic = rememberStrongHaptic()
+    var pressed by remember { mutableStateOf(false) }
+    val btnScale by animateFloatAsState(
+        targetValue = if (pressed) 0.94f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+        label = "btn_scale"
+    )
+    LaunchedEffect(pressed) {
+        if (pressed) { delay(150); pressed = false }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -222,10 +241,11 @@ fun QuickAddBottomSheet(
 
             // Add to cart button
             Button(
-                onClick = { onAddToCart(selectedVariantName, selectedImageUrl, activePrice) },
+                onClick = { haptic(); pressed = true; onAddToCart(selectedVariantName, selectedImageUrl, activePrice) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
+                    .height(52.dp)
+                    .scale(btnScale),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = DalliPrimary)
             ) {

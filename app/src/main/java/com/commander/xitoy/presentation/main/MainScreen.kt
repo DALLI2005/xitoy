@@ -47,6 +47,8 @@ import com.commander.xitoy.domain.model.CartManager
 import com.commander.xitoy.domain.model.Product
 import com.commander.xitoy.domain.model.SelectedProductHolder
 import com.commander.xitoy.presentation.cart.CartScreen
+import com.commander.xitoy.presentation.common.tabEnter
+import com.commander.xitoy.presentation.common.tabExit
 import com.commander.xitoy.presentation.favorites.FavoritesScreen
 import com.commander.xitoy.presentation.home.HomeScreen
 import com.commander.xitoy.presentation.home.HomeViewModel
@@ -181,7 +183,8 @@ fun MainScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            composable("home") {
+            composable("home", enterTransition = tabEnter, exitTransition = tabExit,
+                popEnterTransition = tabEnter, popExitTransition = tabExit) {
                 HomeScreen(
                     viewModel = homeViewModel,
                     onProductClick = { product ->
@@ -203,7 +206,8 @@ fun MainScreen(
                 )
             }
 
-            composable("catalog") {
+            composable("catalog", enterTransition = tabEnter, exitTransition = tabExit,
+                popEnterTransition = tabEnter, popExitTransition = tabExit) {
                 com.commander.xitoy.presentation.catalog.CatalogScreen(
                     onProductClick = { product ->
                         SelectedProductHolder.product = product
@@ -220,7 +224,8 @@ fun MainScreen(
                 )
             }
 
-            composable("cart") {
+            composable("cart", enterTransition = tabEnter, exitTransition = tabExit,
+                popEnterTransition = tabEnter, popExitTransition = tabExit) {
                 CartScreen(
                     onBackClick = { bottomNavController.navigate("home") },
                     onOrderPlaced = {
@@ -238,11 +243,13 @@ fun MainScreen(
                 )
             }
 
-            composable("orders") {
+            composable("orders", enterTransition = tabEnter, exitTransition = tabExit,
+                popEnterTransition = tabEnter, popExitTransition = tabExit) {
                 com.commander.xitoy.presentation.orders.OrdersScreen()
             }
 
-            composable("profile") {
+            composable("profile", enterTransition = tabEnter, exitTransition = tabExit,
+                popEnterTransition = tabEnter, popExitTransition = tabExit) {
                 com.commander.xitoy.presentation.profile.ProfileScreen(
                     onLoginClick = { rootNavController.navigate("login") },
                     onLogout = {
@@ -253,7 +260,8 @@ fun MainScreen(
                 )
             }
 
-            composable("favorites") {
+            composable("favorites", enterTransition = tabEnter, exitTransition = tabExit,
+                popEnterTransition = tabEnter, popExitTransition = tabExit) {
                 FavoritesScreen(
                     onProductClick = { product ->
                         SelectedProductHolder.product = product

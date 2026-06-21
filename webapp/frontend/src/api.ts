@@ -46,6 +46,7 @@ export const api = {
     variantlar_yoqilgan?: boolean
     variant_nomlari?: string[]
     variant_narxlari?: number[]
+    razmer_matritsa?: Record<string, { nomi: string; narx: number }[]>
   }) =>
     request<any>('/products', {
       method: 'POST',
@@ -104,6 +105,7 @@ export const api = {
     variantlar_yoqilgan?: boolean
     variant_nomlari?: string[]
     variant_narxlari?: number[]
+    razmer_matritsa?: Record<string, { nomi: string; narx: number }[]>
   }) =>
     request(`/products/${id}`, {
       method: 'PUT',

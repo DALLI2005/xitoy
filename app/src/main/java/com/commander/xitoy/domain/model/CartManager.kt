@@ -8,26 +8,33 @@ object CartManager {
     private val _cartItems = MutableStateFlow<List<CartItem>>(emptyList())
     val cartItems: StateFlow<List<CartItem>> = _cartItems.asStateFlow()
 
-    fun addToCart(product: Product, variantName: String? = null, variantPrice: Double? = null, variantImageUrl: String? = null) {
+    fun addToCart(product: Product, variantName: String? = null, variantPrice: Double? = null, variantImageUrl: String? = null, sizeName: String? = null) {
         val item = CartItem(
             product = product,
             variantName = variantName,
             effectivePrice = variantPrice ?: product.price,
-            variantImageUrl = variantImageUrl
+            variantImageUrl = variantImageUrl,
+            sizeName = sizeName
         )
         _cartItems.value = _cartItems.value + item
     }
 
     fun removeFromCart(item: CartItem) {
         val list = _cartItems.value.toMutableList()
-        val idx = list.indexOfFirst { it.product.name == item.product.name && it.variantName == item.variantName }
+        val idx = list.indexOfFirst {
+            it.product.name == item.product.name &&
+            it.variantName == item.variantName &&
+            it.sizeName == item.sizeName
+        }
         if (idx >= 0) list.removeAt(idx)
         _cartItems.value = list
     }
 
     fun removeAllOf(item: CartItem) {
         _cartItems.value = _cartItems.value.filter {
-            it.product.name != item.product.name || it.variantName != item.variantName
+            it.product.name != item.product.name ||
+            it.variantName != item.variantName ||
+            it.sizeName != item.sizeName
         }
     }
 

@@ -1,6 +1,13 @@
 package com.commander.xitoy.presentation.home
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -64,6 +71,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -86,6 +95,7 @@ import com.commander.xitoy.domain.model.SessionManager
 import com.commander.xitoy.presentation.common.OrderProgressBar
 import com.commander.xitoy.presentation.common.holatDisplay
 import com.commander.xitoy.presentation.common.holatToStage
+import com.commander.xitoy.presentation.common.rememberStrongHaptic
 import com.commander.xitoy.presentation.orders.OrdersState
 import com.commander.xitoy.presentation.orders.OrdersViewModel
 import com.commander.xitoy.ui.theme.DalliAccent
@@ -450,6 +460,36 @@ private fun FlatSearchBar(value: String, onValueChange: (String) -> Unit) {
 
 @Composable
 private fun HeroBanner(onClick: () -> Unit, totalCount: Int = 0) {
+    val infiniteTransition = rememberInfiniteTransition(label = "hero_motion")
+
+    val circle1Scale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.28f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2600, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "circle1_scale"
+    )
+    val circle2Offset by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 35f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "circle2_offset"
+    )
+    val shimmerOffset by infiniteTransition.animateFloat(
+        initialValue = -300f,
+        targetValue = 600f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2200, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "shimmer"
+    )
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -462,13 +502,39 @@ private fun HeroBanner(onClick: () -> Unit, totalCount: Int = 0) {
             )
             .clickable { onClick() }
     ) {
+        // Doira 1: sekin pulsatsiya (nafas olish effekti)
         Box(
-            modifier = Modifier.size(130.dp).offset(x = 230.dp, y = (-20).dp)
-                .clip(CircleShape).background(Color.White.copy(alpha = 0.1f))
+            modifier = Modifier
+                .size(130.dp)
+                .offset(x = 230.dp, y = (-20).dp)
+                .scale(circle1Scale)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.18f))
         )
+        // Doira 2: sekin vertikal suzish
         Box(
-            modifier = Modifier.size(90.dp).offset(x = 280.dp, y = 90.dp)
-                .clip(CircleShape).background(Color.White.copy(alpha = 0.07f))
+            modifier = Modifier
+                .size(90.dp)
+                .offset(x = 280.dp, y = (90f - circle2Offset).dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.14f))
+        )
+        // Shimmer qatlami: diagonal yorug'lik chizig'i
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .clip(RoundedCornerShape(20.dp))
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.White.copy(alpha = 0.16f),
+                            Color.Transparent
+                        ),
+                        start = Offset(shimmerOffset, 0f),
+                        end = Offset(shimmerOffset + 250f, 200f)
+                    )
+                )
         )
         Column(
             modifier = Modifier
@@ -618,6 +684,7 @@ fun ProductCard(
     val isHot = product.soldCount >= 100
 
     val isTemporary = product.discountType == "vaqtinchalik" && !product.discountExpires.isNullOrBlank()
+    val haptic = rememberStrongHaptic()
 
     Card(
         onClick = onClick,
@@ -755,7 +822,7 @@ fun ProductCard(
                             .size(34.dp)
                             .clip(RoundedCornerShape(10.dp))
                             .background(DalliPrimary)
-                            .clickable { onQuickAdd() },
+                            .clickable { haptic(); onQuickAdd() },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -872,6 +939,7 @@ private fun PriceText(value: Long, numberSize: TextUnit, somSize: TextUnit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ProductRow(product: Product, onClick: () -> Unit, onQuickAdd: () -> Unit = {}) {
+    val haptic = rememberStrongHaptic()
     Card(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
@@ -931,7 +999,7 @@ private fun ProductRow(product: Product, onClick: () -> Unit, onQuickAdd: () -> 
                         modifier = Modifier
                             .clip(RoundedCornerShape(10.dp))
                             .background(DalliPrimary)
-                            .clickable { onQuickAdd() }
+                            .clickable { haptic(); onQuickAdd() }
                             .padding(horizontal = 14.dp, vertical = 8.dp),
                         contentAlignment = Alignment.Center
                     ) {

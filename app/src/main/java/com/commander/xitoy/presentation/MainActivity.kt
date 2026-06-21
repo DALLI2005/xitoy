@@ -38,6 +38,11 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.commander.xitoy.domain.model.SelectedProductHolder
 import com.commander.xitoy.domain.model.SessionManager
+import com.commander.xitoy.presentation.onboarding.OnboardingScreen
+import com.commander.xitoy.presentation.common.slideEnter
+import com.commander.xitoy.presentation.common.slideExit
+import com.commander.xitoy.presentation.common.slidePopEnter
+import com.commander.xitoy.presentation.common.slidePopExit
 import com.commander.xitoy.presentation.details.DetailsScreen
 import com.commander.xitoy.presentation.home.HomeViewModel
 import com.commander.xitoy.presentation.login.LoginScreen
@@ -93,6 +98,14 @@ class MainActivity : ComponentActivity() {
                             com.commander.xitoy.presentation.splash.SplashScreen(navController = rootNavController)
                         }
 
+                        composable("onboarding") {
+                            OnboardingScreen(onFinish = {
+                                rootNavController.navigate("login") {
+                                    popUpTo("onboarding") { inclusive = true }
+                                }
+                            })
+                        }
+
                         composable(
                             route = "main_screen?tab={tab}",
                             arguments = listOf(
@@ -110,7 +123,13 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        composable("login") {
+                        composable(
+                            "login",
+                            enterTransition = slideEnter,
+                            exitTransition = slideExit,
+                            popEnterTransition = slidePopEnter,
+                            popExitTransition = slidePopExit
+                        ) {
                             LoginScreen(
                                 onLoginSuccess = {
                                     rootNavController.navigate("main_screen") {
@@ -120,7 +139,13 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        composable("details") {
+                        composable(
+                            "details",
+                            enterTransition = slideEnter,
+                            exitTransition = slideExit,
+                            popEnterTransition = slidePopEnter,
+                            popExitTransition = slidePopExit
+                        ) {
                             val product = SelectedProductHolder.product
                             if (product != null) {
                                 val viewModel: HomeViewModel = hiltViewModel()
@@ -143,7 +168,13 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        composable("sales") {
+                        composable(
+                            "sales",
+                            enterTransition = slideEnter,
+                            exitTransition = slideExit,
+                            popEnterTransition = slidePopEnter,
+                            popExitTransition = slidePopExit
+                        ) {
                             SalesScreen(
                                 onProductClick = { product ->
                                     SelectedProductHolder.product = product
@@ -173,7 +204,13 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        composable("order/{id}") { backStackEntry ->
+                        composable(
+                            "order/{id}",
+                            enterTransition = slideEnter,
+                            exitTransition = slideExit,
+                            popEnterTransition = slidePopEnter,
+                            popExitTransition = slidePopExit
+                        ) { backStackEntry ->
                             val id = backStackEntry.arguments?.getString("id") ?: ""
                             OrderScreen(
                                 id = id,
@@ -183,6 +220,10 @@ class MainActivity : ComponentActivity() {
 
                         composable(
                             route = "payment/{orderId}/{total}",
+                            enterTransition = slideEnter,
+                            exitTransition = slideExit,
+                            popEnterTransition = slidePopEnter,
+                            popExitTransition = slidePopExit,
                             arguments = listOf(
                                 navArgument("orderId") { type = NavType.StringType },
                                 navArgument("total")   { type = NavType.StringType }
