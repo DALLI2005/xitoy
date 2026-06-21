@@ -75,6 +75,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.commander.xitoy.data.remote.OrderItem
 import com.commander.xitoy.domain.model.CartManager
 import com.commander.xitoy.domain.model.CurrencyRateManager
@@ -635,7 +636,11 @@ fun ProductCard(
                     .clip(RoundedCornerShape(12.dp))
             ) {
                 AsyncImage(
-                    model = product.imageUrl,
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(product.imageUrl)
+                        .size(400, 400)
+                        .crossfade(150)
+                        .build(),
                     contentDescription = product.name,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
@@ -880,7 +885,11 @@ private fun ProductRow(product: Product, onClick: () -> Unit, onQuickAdd: () -> 
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             AsyncImage(
-                model = product.imageUrl,
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(product.imageUrl)
+                    .size(200, 200)
+                    .crossfade(150)
+                    .build(),
                 contentDescription = product.name,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.size(96.dp).clip(RoundedCornerShape(12.dp))

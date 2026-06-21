@@ -38,7 +38,10 @@ object AppModule {
                     .maxSizePercent(0.02)
                     .build()
             }
-            .crossfade(true)
+            .crossfade(150)
+            .allowHardware(true)
+            .allowRgb565(true)
+            .respectCacheHeaders(false)
             .build()
 
     @Provides
