@@ -123,11 +123,17 @@ fun CartScreen(
                 == PackageManager.PERMISSION_GRANTED
         )
     }
+    var locationDeniedOnce by remember { mutableStateOf(false) }
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { perms -> locationPermissionGranted = perms.values.any { it } }
+    ) { perms ->
+        val granted = perms.values.any { it }
+        locationPermissionGranted = granted
+        if (!granted) locationDeniedOnce = true
+    }
 
     var showOutsideRishtonWarning by remember { mutableStateOf(false) }
+    var showLocationRationale by remember { mutableStateOf(false) }
     var pendingOrderAction by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     // Error toast
@@ -268,13 +274,18 @@ fun CartScreen(
                                 )
                             }
                             val firstItem = groupedItems.firstOrNull()?.first
-                            val orderAction: () -> Unit = {
+                            val orderAction: (gpsCoords: Pair<Double, Double>?) -> Unit = { gpsCoords ->
                                 showDialog = false
+                                val finalLocationLink = if (gpsCoords != null) {
+                                    "https://maps.google.com/?q=${gpsCoords.first},${gpsCoords.second}"
+                                } else {
+                                    session?.address ?: ""
+                                }
                                 viewModel.placeOrder(
                                     telegramId          = session?.telegramId ?: "",
                                     fullname            = name,
                                     phone               = phone,
-                                    locationLink        = session?.address ?: "",
+                                    locationLink        = finalLocationLink,
                                     mahsulotlar         = itemsText,
                                     jamiSumma           = totalPrice.toLong(),
                                     mahsulotRasm        = firstItem?.variantImageUrl ?: firstItem?.product?.imageUrl,
@@ -282,26 +293,34 @@ fun CartScreen(
                                 )
                             }
 
-                            // Ruxsat hali so'ralmagan bo'lsa, parallel ravishda so'rash
+                            // Ruxsat so'rash — birinchi marta to'g'ridan, ikkinchi marta tushuntiruvchi dialog
                             if (!locationPermissionGranted) {
-                                locationPermissionLauncher.launch(
-                                    arrayOf(
-                                        Manifest.permission.ACCESS_FINE_LOCATION,
-                                        Manifest.permission.ACCESS_COARSE_LOCATION
+                                if (locationDeniedOnce) {
+                                    showLocationRationale = true
+                                } else {
+                                    locationPermissionLauncher.launch(
+                                        arrayOf(
+                                            Manifest.permission.ACCESS_FINE_LOCATION,
+                                            Manifest.permission.ACCESS_COARSE_LOCATION
+                                        )
                                     )
-                                )
+                                }
                             }
 
                             // Lokatsiya tekshiruvi — 8 soniya timeout, TO'SIQ EMAS
                             coroutineScope.launch {
-                                val distance = withTimeoutOrNull(8000) {
-                                    RishtonLocationChecker.getDistanceFromRishtonKm(context)
+                                val result = withTimeoutOrNull(8000) {
+                                    RishtonLocationChecker.getLocationResult(context)
                                 }
-                                if (RishtonLocationChecker.isOutsideRishton(distance)) {
-                                    pendingOrderAction = orderAction
+                                val coords = if (result?.latitude != null && result.longitude != null) {
+                                    Pair(result.latitude, result.longitude)
+                                } else null
+
+                                if (RishtonLocationChecker.isOutsideRishton(result?.distanceKm)) {
+                                    pendingOrderAction = { orderAction(coords) }
                                     showOutsideRishtonWarning = true
                                 } else {
-                                    orderAction()
+                                    orderAction(coords)
                                 }
                             }
                         } else {
@@ -381,6 +400,59 @@ fun CartScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = DalliPrimary)
                 ) {
                     Text("To'lovga o'tish", fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
+
+    // Joylashuvga ruxsat tushuntiruvchi dialog (ikkinchi marta so'raganda)
+    if (showLocationRationale) {
+        AlertDialog(
+            onDismissRequest = { showLocationRationale = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(24.dp),
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.LocationOn,
+                    contentDescription = null,
+                    tint = DalliPrimary,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Joylashuvga ruxsat kerak",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            },
+            text = {
+                Text(
+                    text = "Buyurtmangizni tezroq va aniqroq yetkazib berishimiz uchun joriy joylashuvingizni bilishimiz kerak. Bu faqat yetkazib berish uchun ishlatiladi.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = DalliMuted
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showLocationRationale = false
+                        locationPermissionLauncher.launch(
+                            arrayOf(
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                Manifest.permission.ACCESS_COARSE_LOCATION
+                            )
+                        )
+                    },
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = DalliPrimary)
+                ) {
+                    Text("Ruxsat berish", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLocationRationale = false }) {
+                    Text("Keyinroq", color = DalliMuted)
                 }
             }
         )
