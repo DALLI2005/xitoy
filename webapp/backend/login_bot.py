@@ -18,9 +18,12 @@ Token .env dagi LOGIN_BOT_TOKEN dan o'qiladi (kod ichiga yozilmaydi).
 """
 
 import asyncio
+import logging
 import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
+
+log = logging.getLogger(__name__)
 
 try:
     from dotenv import load_dotenv
@@ -165,6 +168,18 @@ async def confirm_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"✅ Xush kelibsiz, {fullname}!\n\nEndi ilovaga qaytishingiz mumkin."
         )
         context.user_data.clear()
+
+        chat_id = query.message.chat_id
+        message_id = query.message.message_id
+
+        async def _delete_welcome():
+            await asyncio.sleep(120)  # 2 daqiqa
+            try:
+                await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+            except Exception as e:
+                log.warning("Xush kelibsiz xabarini o'chirishda xato: %s", e)
+
+        asyncio.create_task(_delete_welcome())
         return ConversationHandler.END
 
     # Yangi foydalanuvchi — to'liq ro'yxatdan o'tish oqimi (telefon → ism → manzil)
@@ -308,7 +323,7 @@ async def get_address(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:  # noqa: BLE001
         print(f"User saqlashda xato: {e}")
 
-    await update.message.reply_text(
+    sent = await update.message.reply_text(
         "✅ Ro'yxatdan o'tdingiz!\n\n"
         f"👤 {fullname}\n"
         f"📱 {phone}\n"
@@ -317,6 +332,18 @@ async def get_address(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=ReplyKeyboardRemove(),
     )
     context.user_data.clear()
+
+    sent_chat_id = sent.chat_id
+    sent_message_id = sent.message_id
+
+    async def _delete_registration():
+        await asyncio.sleep(120)  # 2 daqiqa
+        try:
+            await context.bot.delete_message(chat_id=sent_chat_id, message_id=sent_message_id)
+        except Exception as e:
+            log.warning("Ro'yxatdan o'tdingiz xabarini o'chirishda xato: %s", e)
+
+    asyncio.create_task(_delete_registration())
     return ConversationHandler.END
 
 
