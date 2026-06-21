@@ -86,6 +86,20 @@ fun ProfileScreen(
         viewModel.loadStats()
     }
 
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val notificationsEnabled = remember { mutableStateOf(NotificationPermissionManager.isGranted(context)) }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                notificationsEnabled.value = NotificationPermissionManager.isGranted(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     val session = SessionManager.session.collectAsState().value
     // To'liq ismni afzal ko'ramiz (bot orqali kiritilgan), bo'lmasa Telegram ismi
     val ism = session?.fullname?.takeIf { it.isNotBlank() }
@@ -112,6 +126,55 @@ fun ProfileScreen(
 
         ProfileUserCard(ism = ism, username = username)
         Spacer(modifier = Modifier.height(14.dp))
+
+        // Bildirishnoma o'chiq eslatmasi
+        if (!notificationsEnabled.value) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(DalliAccentSoft)
+                    .padding(16.dp)
+            ) {
+                Row(verticalAlignment = Alignment.Top) {
+                    Icon(
+                        Icons.Default.NotificationsOff,
+                        contentDescription = null,
+                        tint = DalliAccentInk,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Bildirishnomalar o'chiq",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = DalliAccentInk
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            "Siz buni o'chirib qo'ydingiz — buyurtma holati va chegirmalar haqida bilmay qolishingiz mumkin",
+                            fontSize = 12.5.sp,
+                            color = DalliAccentInk.copy(alpha = 0.8f),
+                            lineHeight = 17.sp
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        TextButton(
+                            onClick = { NotificationPermissionManager.openNotificationSettings(context) },
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text(
+                                "Qayta yoqish →",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                color = DalliPrimary
+                            )
+                        }
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(14.dp))
+        }
 
         if (phone != null || address != null) {
             ProfileContactCard(phone = phone, address = address)
