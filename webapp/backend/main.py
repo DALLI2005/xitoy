@@ -64,13 +64,25 @@ CATEGORIES = ["Kiyim", "Elektronika", "Poyabzal", "Aksessuar", "Sport", "Uy uchu
 # Sarlavha qisqartirish uchun keraksiz marketing so'zlari ro'yxati
 # (real tarjima natijalarini ko'rib, kengaytirish mumkin)
 NOISE_TITLE_WORDS = [
+    # Marketing klishelari
     "yangi", "premium", "yuqori sifat", "yuqori sifatli",
-    "tezkor yetkazib berish", "bepul yetkazib berish",
-    "rasmiy", "original", "100%", "eng yaxshi", "maxsus",
+    "eng yaxshi", "maxsus", "rasmiy", "original", "100%",
     "chegirma", "aksiya", "tavsiya etiladi", "mashhur",
-    "issiq sotuv", "ko'p sotiladigan", "trend",
-    "kichik narx", "arzon", "iste'molchi", "ulgurji",
-    "sifat kafolati", "tez yetkazish", "bepul",
+    "issiq sotuv", "trend", "arzon", "bepul",
+    "sifat kafolati", "kichik narx", "iste'molchi", "ulgurji",
+    # Tarjimada ko'p chiqadigan filler iboralar (testdan)
+    "tezkor yetkazib berish", "bepul yetkazib berish", "tez yetkazish",
+    "tasodifiy", "bo'shashgan", "universal",
+    "o'g'il bolalar va qizlar uchun",
+    "erkaklar va ayollar uchun",
+    "bahor va kuzgi",
+    "yiqilishga qarshi",
+    "nafas oladigan",
+    "silliq bo'lmagan",
+    "ko'p qirrali",
+    "ko'p funksiyali",
+    "yuqori darajadagi",
+    "moda va",
 ]
 
 log = logging.getLogger(__name__)
@@ -447,30 +459,45 @@ def require_super(user: dict = Depends(get_current_user)):
     return user
 
 
-def _shorten_title(text: str, max_words: int = 7, max_chars: int = 50) -> str:
+def _shorten_title(text: str, max_words: int = 6, max_chars: int = 48) -> str:
     import re
     # 1) Birinchi vergul/nuqta/qavsgacha bo'lgan qismni olish
     first_part = re.split(r'[,，。()（）\[\]【】|/]', text)[0].strip()
     if not first_part:
         first_part = text.strip()
 
-    # 2) NOISE_TITLE_WORDS ro'yxatidagi keraksiz so'zlarni olib tashlash
-    cleaned = first_part
-    for w in NOISE_TITLE_WORDS:
+    # 2) Yil raqamlari va "yilgi/yillik" iboralarini olib tashlash
+    cleaned = re.sub(r'\b20[2-3]\d\s*(yilgi|yillik)?\b', '', first_part)
+
+    # 3) NOISE_TITLE_WORDS keraksiz iboralarini olib tashlash (uzundan qisqaga tartiblangan)
+    for w in sorted(NOISE_TITLE_WORDS, key=len, reverse=True):
         cleaned = re.sub(re.escape(w), "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r'\s+', ' ', cleaned).strip(" -–—,.")
 
     if not cleaned:
         cleaned = first_part
 
-    # 3) So'z sonini cheklash
-    words = cleaned.split()
-    if len(words) > max_words:
-        cleaned = " ".join(words[:max_words])
+    def _trim_trailing(word_list: list[str]) -> list[str]:
+        bad = {"uchun", "va", "bilan", "ham", "yoki", "esa", "bu"}
+        while word_list and (word_list[-1].lower() in bad or
+                             (len(word_list[-1]) > 6 and word_list[-1].endswith("ni"))):
+            word_list.pop()
+        return word_list
 
-    # 4) Belgi sonini cheklash (so'z o'rtasida kesilmasligi uchun)
+    # 4) So'z cheklanishidan oldin bog'lovchilarni tozalash
+    words = _trim_trailing(cleaned.split())
+
+    # 5) So'z sonini cheklash
+    if len(words) > max_words:
+        words = words[:max_words]
+    cleaned = " ".join(words)
+
+    # 6) Belgi sonini cheklash (so'z o'rtasida kesilmasligi uchun)
     if len(cleaned) > max_chars:
         cleaned = cleaned[:max_chars].rsplit(" ", 1)[0]
+        # 7) Kesishdan so'ng yana tekshiruv
+        words2 = _trim_trailing(cleaned.split())
+        cleaned = " ".join(words2)
 
     cleaned = cleaned[0].upper() + cleaned[1:] if cleaned else cleaned
     return cleaned or text[:max_chars]
