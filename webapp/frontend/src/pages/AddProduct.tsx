@@ -7,32 +7,37 @@ import type { User } from '../types'
 
 interface Props { user: User }
 
+// Cargo narxi — real shartnoma bo'yicha $6/kg
+const CARGO_USD_PER_KG = 6
+// Sof foyda foizi — admin tomonidan belgilanadi, hozircha 10%
+const PROFIT_PERCENT = 10
+
 interface CategoryConfig {
-  bufferPercent: number
-  profitPercent: number
+  // Taxminiy o'rtacha og'irlik (kg) — real tajriba asosida o'zgartirish mumkin
+  avgWeightKg: number
 }
 
 const CATEGORY_CONFIGS: Record<string, CategoryConfig> = {
-  'Kiyim':       { bufferPercent: 25, profitPercent: 35 },
-  'Elektronika': { bufferPercent: 15, profitPercent: 25 },
-  'Poyabzal':    { bufferPercent: 20, profitPercent: 30 },
-  'Aksessuar':   { bufferPercent: 25, profitPercent: 40 },
-  'Sport':       { bufferPercent: 20, profitPercent: 30 },
-  'Uy uchun':    { bufferPercent: 10, profitPercent: 25 },
-  'Boshqa':      { bufferPercent: 25, profitPercent: 30 },
+  'Aksessuar':   { avgWeightKg: 0.15 },
+  'Kiyim':       { avgWeightKg: 0.35 },
+  'Elektronika': { avgWeightKg: 0.40 },
+  'Boshqa':      { avgWeightKg: 0.40 },
+  'Sport':       { avgWeightKg: 0.60 },
+  'Poyabzal':    { avgWeightKg: 0.80 },
+  'Uy uchun':    { avgWeightKg: 1.00 },
 }
 
 function getConfig(category: string): CategoryConfig {
   return CATEGORY_CONFIGS[category] ?? CATEGORY_CONFIGS['Boshqa']
 }
 
-function calcBreakdown(yuan: number, cnyRate: number, config: CategoryConfig) {
-  const effectiveRate = cnyRate * (1 + config.bufferPercent / 100)
-  const productCostSom = yuan * effectiveRate
-  const totalWithSafety = productCostSom + 5000
-  const profitAmount = totalWithSafety * config.profitPercent / 100
-  const finalPrice = Math.ceil((totalWithSafety + profitAmount) / 1000) * 1000
-  return { effectiveRate, productCostSom, profitAmount, finalPrice }
+function calcBreakdown(yuan: number, cnyRate: number, usdRate: number, config: CategoryConfig) {
+  const tannarx  = yuan * cnyRate
+  const cargo    = config.avgWeightKg * CARGO_USD_PER_KG * usdRate
+  const foyda    = tannarx * (PROFIT_PERCENT / 100)
+  const rawTotal = tannarx + cargo + foyda
+  const finalPrice = Math.floor(rawTotal / 1000) * 1000
+  return { tannarx, cargo, foyda, finalPrice }
 }
 
 function fmt(n: number): string {
@@ -57,7 +62,9 @@ const DURATION_OPTIONS = [
 ]
 
 const EMPTY = { name: '', yuan: '', discount: '', category: '', description: '', rating: '4.5', sold_count: '10' }
-const RATE_KEY = 'cny_rate_cache'
+const RATE_KEY     = 'cny_rate_cache'
+const USD_RATE_KEY = 'usd_rate_cache'
+const USD_FALLBACK = 12700
 
 type ToastType = 'success' | 'error'
 interface Toast { type: ToastType; msg: string }
@@ -68,6 +75,7 @@ export default function AddProduct({ user }: Props) {
   const [loading, setLoading]         = useState(false)
   const [toast, setToast]             = useState<Toast | null>(null)
   const [cnyRate, setCnyRate]         = useState<number | null>(null)
+  const [usdRate, setUsdRate]         = useState<number>(USD_FALLBACK)
   const [rateLabel, setRateLabel]     = useState('')
   const [rateLoading, setRateLoading] = useState(false)
   const [discountType, setDiscountType]     = useState<DiscountType>('permanent')
@@ -140,6 +148,28 @@ export default function AddProduct({ user }: Props) {
 
   useEffect(() => { fetchRate() }, [fetchRate])
 
+  useEffect(() => {
+    const cached = localStorage.getItem(USD_RATE_KEY)
+    if (cached) {
+      try {
+        const { rate, today } = JSON.parse(cached)
+        if (today === new Date().toISOString().slice(0, 10) && rate > 0) {
+          setUsdRate(rate); return
+        }
+      } catch {}
+    }
+    fetch('https://cbu.uz/uz/arkhiv-kursov-valyut/json/USD/')
+      .then(r => r.json())
+      .then(data => {
+        const rate = parseFloat(data[0].Rate)
+        setUsdRate(rate)
+        localStorage.setItem(USD_RATE_KEY, JSON.stringify({
+          rate, today: new Date().toISOString().slice(0, 10)
+        }))
+      })
+      .catch(() => setUsdRate(USD_FALLBACK))
+  }, [])
+
   function set(field: string, value: string) {
     setForm(f => ({ ...f, [field]: value }))
   }
@@ -167,7 +197,7 @@ export default function AddProduct({ user }: Props) {
   const yuanNum  = parseFloat(form.yuan) || 0
   const config   = getConfig(form.category)
   const breakdown = (yuanNum > 0 && cnyRate && form.category)
-    ? calcBreakdown(yuanNum, cnyRate, config)
+    ? calcBreakdown(yuanNum, cnyRate, usdRate, config)
     : null
 
   async function handleTranslateAndShorten() {
@@ -202,7 +232,7 @@ export default function AddProduct({ user }: Props) {
       }
     }
 
-    const finalPrice = calcBreakdown(yuanNum, cnyRate, config).finalPrice
+    const finalPrice = calcBreakdown(yuanNum, cnyRate, usdRate, config).finalPrice
 
     const razmerMatritsa: Record<string, {nomi: string, narx: number}[]> = {}
     Object.entries(sizesByColor).forEach(([colorIdx, sizes]) => {
@@ -697,17 +727,16 @@ export default function AddProduct({ user }: Props) {
             </label>
             <div className="flex flex-col gap-2">
               <Row
-                label={`Kurs (+${config.bufferPercent}% bufer)`}
-                value={`1¥ = ${fmt(breakdown.effectiveRate)} so'm`}
+                label={`Tannarx (${form.yuan}¥)`}
+                value={`${fmt(breakdown.tannarx)} so'm`}
               />
               <Row
-                label={`Tovar (${form.yuan}¥ × ${fmt(breakdown.effectiveRate)})`}
-                value={`${fmt(breakdown.productCostSom)} so'm`}
+                label={`Cargo (${config.avgWeightKg}kg × $${CARGO_USD_PER_KG})`}
+                value={`+ ${fmt(breakdown.cargo)} so'm`}
               />
-              <Row label="Xavfsizlik zaxira" value="+ 5 000 so'm" />
               <Row
-                label={`Foyda (${config.profitPercent}%)`}
-                value={`+ ${fmt(breakdown.profitAmount)} so'm`}
+                label={`Foyda (${PROFIT_PERCENT}%)`}
+                value={`+ ${fmt(breakdown.foyda)} so'm`}
               />
               <div
                 className="flex justify-between text-base font-semibold pt-2 mt-1"
