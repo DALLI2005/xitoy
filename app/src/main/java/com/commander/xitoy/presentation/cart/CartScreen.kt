@@ -1,6 +1,10 @@
 package com.commander.xitoy.presentation.cart
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.ShoppingCart
@@ -44,7 +49,12 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.core.content.ContextCompat
+import com.commander.xitoy.domain.model.RishtonLocationChecker
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -66,6 +76,7 @@ import com.commander.xitoy.domain.model.Product
 import com.commander.xitoy.domain.model.SessionManager
 import com.commander.xitoy.presentation.common.rememberHaptic
 import com.commander.xitoy.presentation.common.rememberStrongHaptic
+import com.commander.xitoy.ui.theme.DalliAccentInk
 import com.commander.xitoy.ui.theme.DalliBackground
 import com.commander.xitoy.ui.theme.DalliLine
 import com.commander.xitoy.ui.theme.DalliMuted
@@ -104,6 +115,20 @@ fun CartScreen(
     }
 
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    var locationPermissionGranted by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { perms -> locationPermissionGranted = perms.values.any { it } }
+
+    var showOutsideRishtonWarning by remember { mutableStateOf(false) }
+    var pendingOrderAction by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     // Error toast
     LaunchedEffect(orderState) {
@@ -242,18 +267,43 @@ fun CartScreen(
                                     rasm    = item.variantImageUrl ?: item.product.imageUrl
                                 )
                             }
-                            showDialog = false
                             val firstItem = groupedItems.firstOrNull()?.first
-                            viewModel.placeOrder(
-                                telegramId          = session?.telegramId ?: "",
-                                fullname            = name,
-                                phone               = phone,
-                                locationLink        = session?.address ?: "",
-                                mahsulotlar         = itemsText,
-                                jamiSumma           = totalPrice.toLong(),
-                                mahsulotRasm        = firstItem?.variantImageUrl ?: firstItem?.product?.imageUrl,
-                                mahsulotlarRoyxati  = royxat
-                            )
+                            val orderAction: () -> Unit = {
+                                showDialog = false
+                                viewModel.placeOrder(
+                                    telegramId          = session?.telegramId ?: "",
+                                    fullname            = name,
+                                    phone               = phone,
+                                    locationLink        = session?.address ?: "",
+                                    mahsulotlar         = itemsText,
+                                    jamiSumma           = totalPrice.toLong(),
+                                    mahsulotRasm        = firstItem?.variantImageUrl ?: firstItem?.product?.imageUrl,
+                                    mahsulotlarRoyxati  = royxat
+                                )
+                            }
+
+                            // Ruxsat hali so'ralmagan bo'lsa, parallel ravishda so'rash
+                            if (!locationPermissionGranted) {
+                                locationPermissionLauncher.launch(
+                                    arrayOf(
+                                        Manifest.permission.ACCESS_FINE_LOCATION,
+                                        Manifest.permission.ACCESS_COARSE_LOCATION
+                                    )
+                                )
+                            }
+
+                            // Lokatsiya tekshiruvi — 8 soniya timeout, TO'SIQ EMAS
+                            coroutineScope.launch {
+                                val distance = withTimeoutOrNull(8000) {
+                                    RishtonLocationChecker.getDistanceFromRishtonKm(context)
+                                }
+                                if (RishtonLocationChecker.isOutsideRishton(distance)) {
+                                    pendingOrderAction = orderAction
+                                    showOutsideRishtonWarning = true
+                                } else {
+                                    orderAction()
+                                }
+                            }
                         } else {
                             Toast.makeText(context, "Iltimos, ma'lumotlarni to'liq kiriting!", Toast.LENGTH_SHORT).show()
                         }
@@ -331,6 +381,62 @@ fun CartScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = DalliPrimary)
                 ) {
                     Text("To'lovga o'tish", fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
+
+    // Rishton hududidan tashqarida ogohlantirish dialogi
+    if (showOutsideRishtonWarning) {
+        AlertDialog(
+            onDismissRequest = {
+                showOutsideRishtonWarning = false
+                pendingOrderAction = null
+            },
+            containerColor = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(24.dp),
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.LocationOn,
+                    contentDescription = null,
+                    tint = DalliAccentInk,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Diqqat",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.ExtraBold
+                )
+            },
+            text = {
+                Text(
+                    text = "Siz hozir Rishton hududidan tashqarida ko'rinasiz. Baribir buyurtma bermoqchimisiz?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = DalliMuted
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        pendingOrderAction?.invoke()
+                        showOutsideRishtonWarning = false
+                        pendingOrderAction = null
+                    },
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text("Davom etish", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showOutsideRishtonWarning = false
+                        pendingOrderAction = null
+                    }
+                ) {
+                    Text("Bekor qilish", fontWeight = FontWeight.SemiBold)
                 }
             }
         )
