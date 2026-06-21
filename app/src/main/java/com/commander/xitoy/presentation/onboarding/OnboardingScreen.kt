@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -78,6 +79,11 @@ fun OnboardingScreen(onFinish: () -> Unit) {
     val pagerState = rememberPagerState(pageCount = { onboardingPages.size })
     val coroutineScope = rememberCoroutineScope()
 
+    // Barcha 4 ta animatsiyani parallel oldindan yuklash
+    val compositions = onboardingPages.map { page ->
+        rememberLottieComposition(LottieCompositionSpec.Asset(page.animationAsset))
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -108,6 +114,7 @@ fun OnboardingScreen(onFinish: () -> Unit) {
             val pageAlpha = 0.4f + (1f - 0.4f) * fraction
 
             val pageData = onboardingPages[page]
+            val composition by compositions[page]
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -117,14 +124,24 @@ fun OnboardingScreen(onFinish: () -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                val composition by rememberLottieComposition(
-                    LottieCompositionSpec.Asset(pageData.animationAsset)
-                )
-                LottieAnimation(
-                    composition = composition,
-                    iterations = LottieConstants.IterateForever,
-                    modifier = Modifier.size(280.dp)
-                )
+                Box(
+                    modifier = Modifier.size(280.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (composition != null) {
+                        LottieAnimation(
+                            composition = composition,
+                            iterations = LottieConstants.IterateForever,
+                            modifier = Modifier.size(280.dp)
+                        )
+                    } else {
+                        CircularProgressIndicator(
+                            color = DalliPrimary,
+                            strokeWidth = 2.5.dp,
+                            modifier = Modifier.size(36.dp)
+                        )
+                    }
+                }
                 Spacer(Modifier.height(32.dp))
                 Text(
                     text = pageData.title,

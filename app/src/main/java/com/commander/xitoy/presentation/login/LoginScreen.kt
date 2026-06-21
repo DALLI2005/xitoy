@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,9 +29,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -39,9 +43,10 @@ import com.commander.xitoy.R
 import com.commander.xitoy.ui.theme.DalliBackground
 import com.commander.xitoy.ui.theme.DalliMuted
 import com.commander.xitoy.ui.theme.DalliPrimary
+import com.commander.xitoy.ui.theme.DalliPrimaryDark
 import com.commander.xitoy.ui.theme.DalliPrimarySoft
+import com.commander.xitoy.ui.theme.DalliSurface
 import com.commander.xitoy.ui.theme.DalliText
-import androidx.compose.ui.text.font.FontWeight
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.RefreshCw
 import com.composables.icons.lucide.Send
@@ -56,7 +61,6 @@ fun LoginScreen(
     val openUrl by viewModel.openUrl.collectAsState()
     val context = LocalContext.current
 
-    // Telegram havolasini ochish (Intent)
     LaunchedEffect(openUrl) {
         val url = openUrl ?: return@LaunchedEffect
         try {
@@ -70,7 +74,6 @@ fun LoginScreen(
         viewModel.onUrlOpened()
     }
 
-    // Tasdiqlangach Home ga o'tish
     LaunchedEffect(uiState) {
         if (uiState is LoginUiState.Success) {
             onLoginSuccess()
@@ -80,7 +83,11 @@ fun LoginScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(DalliBackground)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(DalliPrimarySoft, DalliBackground)
+                )
+            )
             .padding(horizontal = 28.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -88,22 +95,33 @@ fun LoginScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxWidth()
         ) {
-            // Logo
+            // Logo — soyali, gradient fon
             Box(
                 modifier = Modifier
-                    .size(96.dp)
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(DalliPrimarySoft),
+                    .size(108.dp)
+                    .shadow(
+                        elevation = 16.dp,
+                        shape = RoundedCornerShape(32.dp),
+                        ambientColor = DalliPrimary.copy(alpha = 0.25f),
+                        spotColor = DalliPrimary.copy(alpha = 0.25f)
+                    )
+                    .clip(RoundedCornerShape(32.dp))
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(DalliPrimarySoft, Color.White)
+                        )
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     painter = painterResource(id = R.drawable.ic_great_wall),
                     contentDescription = "Dalli Shop",
                     tint = DalliPrimary,
-                    modifier = Modifier.size(52.dp)
+                    modifier = Modifier.size(56.dp)
                 )
             }
-            Spacer(Modifier.height(22.dp))
+
+            Spacer(Modifier.height(24.dp))
             Text(
                 text = "Xush kelibsiz",
                 fontSize = 26.sp,
@@ -124,29 +142,44 @@ fun LoginScreen(
 
             when (val state = uiState) {
                 is LoginUiState.Starting, is LoginUiState.Waiting -> {
-                    CircularProgressIndicator(color = DalliPrimary, strokeWidth = 3.dp)
-                    Spacer(Modifier.height(16.dp))
-                    Text(
-                        text = "Telegramda tasdiqlang...",
-                        fontSize = 14.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = DalliText,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = "Bot xabaridagi \"✅ Kirishni tasdiqlash\" tugmasini bosing",
-                        fontSize = 12.5.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = DalliMuted,
-                        textAlign = TextAlign.Center
-                    )
-
-                    // Ekran hech qachon qotib qolmasligi uchun — doim ko'rinadigan chiqish yo'li
-                    Spacer(Modifier.height(24.dp))
-                    TextButton(
-                        onClick = { viewModel.cancelAndRetry() }
+                    // Kutish kartochkasi
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .shadow(
+                                elevation = 8.dp,
+                                shape = RoundedCornerShape(20.dp),
+                                ambientColor = DalliPrimary.copy(alpha = 0.1f),
+                                spotColor = DalliPrimary.copy(alpha = 0.1f)
+                            )
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(DalliSurface)
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
                     ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator(color = DalliPrimary, strokeWidth = 3.dp)
+                            Spacer(Modifier.height(16.dp))
+                            Text(
+                                text = "Telegramda tasdiqlang...",
+                                fontSize = 14.5.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = DalliText,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = "Bot xabaridagi \"✅ Kirishni tasdiqlash\" tugmasini bosing",
+                                fontSize = 12.5.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = DalliMuted,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(20.dp))
+                    TextButton(onClick = { viewModel.cancelAndRetry() }) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -185,27 +218,11 @@ fun LoginScreen(
                         textAlign = TextAlign.Center
                     )
                     Spacer(Modifier.height(20.dp))
-                    Button(
-                        onClick = { viewModel.startLogin() },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = DalliPrimary)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(Lucide.RefreshCw, null, tint = Color.White, modifier = Modifier.size(18.dp))
-                            Text(
-                                text = "Qaytadan urinish",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Color.White
-                            )
-                        }
-                    }
+                    GradientLoginButton(
+                        text = "Qaytadan urinish",
+                        icon = { Icon(Lucide.RefreshCw, null, tint = Color.White, modifier = Modifier.size(18.dp)) },
+                        onClick = { viewModel.startLogin() }
+                    )
                 }
 
                 else -> {
@@ -219,31 +236,63 @@ fun LoginScreen(
                         )
                         Spacer(Modifier.height(16.dp))
                     }
-                    Button(
-                        onClick = { viewModel.startLogin() },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = DalliPrimary)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            if (state !is LoginUiState.Error) {
-                                Icon(Lucide.Send, null, tint = Color.White, modifier = Modifier.size(18.dp))
-                            }
-                            Text(
-                                text = if (state is LoginUiState.Error) "Qaytadan urinib ko'rish"
-                                else "Telegram orqali kirish",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Color.White
-                            )
-                        }
-                    }
+                    GradientLoginButton(
+                        text = if (state is LoginUiState.Error) "Qaytadan urinib ko'rish"
+                               else "Telegram orqali kirish",
+                        icon = if (state !is LoginUiState.Error) ({
+                            Icon(Lucide.Send, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                        }) else null,
+                        onClick = { viewModel.startLogin() }
+                    )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GradientLoginButton(
+    text: String,
+    icon: (@Composable () -> Unit)? = null,
+    onClick: () -> Unit
+) {
+    Button(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(58.dp)
+            .shadow(
+                elevation = 12.dp,
+                shape = RoundedCornerShape(18.dp),
+                ambientColor = DalliPrimary.copy(alpha = 0.35f),
+                spotColor = DalliPrimary.copy(alpha = 0.35f)
+            ),
+        shape = RoundedCornerShape(18.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+        contentPadding = PaddingValues(),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(DalliPrimary, DalliPrimaryDark)
+                    )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                icon?.invoke()
+                Text(
+                    text = text,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White
+                )
             }
         }
     }
