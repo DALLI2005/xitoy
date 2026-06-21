@@ -17,13 +17,14 @@ interface CategoryConfig {
   avgWeightKg: number
 }
 
+// Real cargo tajribasi asosida (2026-yil iyun), kg
 const CATEGORY_CONFIGS: Record<string, CategoryConfig> = {
-  'Aksessuar':   { avgWeightKg: 0.15 },
-  'Kiyim':       { avgWeightKg: 0.35 },
+  'Aksessuar':   { avgWeightKg: 0.85 },
+  'Kiyim':       { avgWeightKg: 0.55 },
   'Elektronika': { avgWeightKg: 0.40 },
   'Boshqa':      { avgWeightKg: 0.40 },
   'Sport':       { avgWeightKg: 0.60 },
-  'Poyabzal':    { avgWeightKg: 0.80 },
+  'Poyabzal':    { avgWeightKg: 1.00 },
   'Uy uchun':    { avgWeightKg: 1.00 },
 }
 
