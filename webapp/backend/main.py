@@ -514,7 +514,7 @@ def _do_translate_sync(text: str) -> str:
     return "".join(seg[0] for seg in data[0] if seg[0])
 
 
-@app.post("/admin/translate")
+@app.post("/api/admin/translate")
 async def translate_text(payload: dict, _: dict = Depends(get_current_user)):
     text = (payload.get("text") or "").strip()
     if not text:
@@ -528,7 +528,7 @@ async def translate_text(payload: dict, _: dict = Depends(get_current_user)):
     return {"translated_full": translated_full, "translated_short": translated_short}
 
 
-@app.get("/admin/settings")
+@app.get("/api/admin/settings")
 async def get_admin_settings(_: dict = Depends(require_super)):
     try:
         return await asyncio.to_thread(_get_settings_sync)
@@ -536,7 +536,7 @@ async def get_admin_settings(_: dict = Depends(require_super)):
         return {"marketing_notifications_enabled": True}
 
 
-@app.patch("/admin/settings/notifications")
+@app.patch("/api/admin/settings/notifications")
 async def toggle_notifications(data: NotificationToggleIn, _: dict = Depends(require_super)):
     await sheets_post({
         "action": "updateSettings",
@@ -546,7 +546,7 @@ async def toggle_notifications(data: NotificationToggleIn, _: dict = Depends(req
     return {"status": "success"}
 
 
-@app.post("/admin/broadcast-discount")
+@app.post("/api/admin/broadcast-discount")
 async def broadcast_discount(data: BroadcastDiscountIn, _: dict = Depends(get_current_user)):
     if not await get_marketing_notifications_enabled():
         return {"status": "disabled", "message": "Bildirishnomalar o'chirilgan"}
