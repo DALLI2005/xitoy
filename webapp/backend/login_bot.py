@@ -164,8 +164,11 @@ async def confirm_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("⚠️ Bu so'rov eskirgan. Qaytadan urinib ko'ring.")
             return ConversationHandler.END
 
+        from telegram.helpers import escape_markdown
+        safe_name = escape_markdown(fullname, version=2)
         await query.edit_message_text(
-            f"✅ Xush kelibsiz, {fullname}!\n\nEndi ilovaga qaytishingiz mumkin."
+            f"✅ Xush kelibsiz, *{safe_name}*\\!\n\nEndi ilovaga qaytishingiz mumkin\\.",
+            parse_mode="MarkdownV2"
         )
         context.user_data.clear()
 
