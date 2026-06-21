@@ -18,7 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import com.commander.xitoy.presentation.common.DalliLoadingIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -158,7 +158,11 @@ fun LoginScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator(color = DalliPrimary, strokeWidth = 3.dp)
+                            DalliLoadingIndicator(
+                                size = 56.dp,
+                                logoTint = DalliPrimary,
+                                dotColor = DalliPrimary
+                            )
                             Spacer(Modifier.height(16.dp))
                             Text(
                                 text = "Telegramda tasdiqlang...",

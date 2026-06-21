@@ -4,7 +4,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -13,15 +12,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavController
-import com.commander.xitoy.R
 import com.commander.xitoy.domain.model.OnboardingManager
 import com.commander.xitoy.domain.model.SessionManager
+import com.commander.xitoy.presentation.common.DalliLoadingIndicator
 import kotlinx.coroutines.delay
 
 @Composable
@@ -67,15 +65,12 @@ fun SplashScreen(navController: NavController) {
                 .alpha(alphaAnim.value)
                 .scale(scaleAnim.value)
         ) {
-            // Dalli Shop'ning haqiqiy Buyuk Xitoy devori logotipi
-            Icon(
-                painter = painterResource(id = R.drawable.ic_great_wall),
-                contentDescription = "Dalli Shop Logo",
-                tint = Color.White,
-                modifier = Modifier.size(120.dp)
+            DalliLoadingIndicator(
+                size = 140.dp,
+                logoTint = Color.White,
+                dotColor = Color.White
             )
             Spacer(modifier = Modifier.height(16.dp))
-
             Text(
                 text = "DALLI SHOP",
                 color = Color.White,
