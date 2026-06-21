@@ -6,14 +6,16 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.core.content.ContextCompat
 import androidx.activity.compose.setContent
-import kotlinx.coroutines.flow.MutableStateFlow
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.NotificationsOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -22,23 +24,27 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.activity.viewModels
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.commander.xitoy.domain.model.NotificationPermissionManager
 import com.commander.xitoy.domain.model.SelectedProductHolder
 import com.commander.xitoy.domain.model.SessionManager
-import com.commander.xitoy.presentation.onboarding.OnboardingScreen
 import com.commander.xitoy.presentation.common.slideEnter
 import com.commander.xitoy.presentation.common.slideExit
 import com.commander.xitoy.presentation.common.slidePopEnter
@@ -47,23 +53,41 @@ import com.commander.xitoy.presentation.details.DetailsScreen
 import com.commander.xitoy.presentation.home.HomeViewModel
 import com.commander.xitoy.presentation.login.LoginScreen
 import com.commander.xitoy.presentation.main.MainScreen
+import com.commander.xitoy.presentation.notification.NotificationPermissionScreen
+import com.commander.xitoy.presentation.onboarding.OnboardingScreen
 import com.commander.xitoy.presentation.payment.PaymentScreen
 import com.commander.xitoy.presentation.sales.SalesScreen
+import com.commander.xitoy.ui.theme.DalliMuted
+import com.commander.xitoy.ui.theme.DalliPrimary
 import com.commander.xitoy.ui.theme.XitoyTheme
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.MutableStateFlow
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     companion object {
-        // onNewIntent va cold-start ikkalasida ham Compose tomonidan kuzatiladigan holat
         val pendingRoute = MutableStateFlow<String?>(null)
     }
 
     private val homeViewModel: HomeViewModel by viewModels()
 
+    // Rad etilganda dialog ko'rsatish uchun state
+    private val showNotificationDeniedDialog = mutableStateOf(false)
+
+    // Ruxsat natijasi kelgandan keyin chaqiriladigan callback
+    private var pendingNotificationNavigation: (() -> Unit)? = null
+
+    private val notificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (!granted) {
+                showNotificationDeniedDialog.value = true
+            }
+            pendingNotificationNavigation?.invoke()
+            pendingNotificationNavigation = null
+        }
+
     private fun extractRoute(intent: Intent?): String? {
-        // Deep link URI: dalli://product/123 yoki dalli://order/DS-24850
         intent?.data?.takeIf { it.scheme == "dalli" }?.let { uri ->
             val id = uri.lastPathSegment ?: return@let
             return when (uri.host) {
@@ -72,7 +96,6 @@ class MainActivity : ComponentActivity() {
                 else      -> null
             }
         }
-        // Tab deep link: navigate_to_tab extra (cart, orders...)
         return intent?.getStringExtra("navigate_to_tab")?.let { "main_screen?tab=$it" }
     }
 
@@ -84,7 +107,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        requestNotificationPermission()
         pendingRoute.value = extractRoute(intent)
         setContent {
             XitoyTheme {
@@ -107,6 +129,39 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable(
+                            "login",
+                            enterTransition = slideEnter,
+                            exitTransition = slideExit,
+                            popEnterTransition = slidePopEnter,
+                            popExitTransition = slidePopExit
+                        ) {
+                            LoginScreen(
+                                onLoginSuccess = {
+                                    rootNavController.navigate("notification_permission") {
+                                        popUpTo("login") { inclusive = true }
+                                    }
+                                }
+                            )
+                        }
+
+                        composable("notification_permission") {
+                            NotificationPermissionScreen(
+                                onRequestPermission = {
+                                    requestNotificationPermission {
+                                        rootNavController.navigate("main_screen") {
+                                            popUpTo("notification_permission") { inclusive = true }
+                                        }
+                                    }
+                                },
+                                onSkip = {
+                                    rootNavController.navigate("main_screen") {
+                                        popUpTo("notification_permission") { inclusive = true }
+                                    }
+                                }
+                            )
+                        }
+
+                        composable(
                             route = "main_screen?tab={tab}",
                             arguments = listOf(
                                 navArgument("tab") {
@@ -120,22 +175,6 @@ class MainActivity : ComponentActivity() {
                                 rootNavController = rootNavController,
                                 homeViewModel = homeViewModel,
                                 initialTab = tab
-                            )
-                        }
-
-                        composable(
-                            "login",
-                            enterTransition = slideEnter,
-                            exitTransition = slideExit,
-                            popEnterTransition = slidePopEnter,
-                            popExitTransition = slidePopExit
-                        ) {
-                            LoginScreen(
-                                onLoginSuccess = {
-                                    rootNavController.navigate("main_screen") {
-                                        popUpTo("login") { inclusive = true }
-                                    }
-                                }
                             )
                         }
 
@@ -186,7 +225,6 @@ class MainActivity : ComponentActivity() {
 
                         composable("product/{id}") { backStackEntry ->
                             val id = backStackEntry.arguments?.getString("id") ?: ""
-                            // Activity-scoped homeViewModel — products allaqachon yuklangan bo'ladi
                             val products by homeViewModel.filteredProducts.collectAsState()
 
                             LaunchedEffect(products) {
@@ -247,19 +285,54 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
+                    // Rad etilganda chiquvchi dialog
+                    if (showNotificationDeniedDialog.value) {
+                        val context = LocalContext.current
+                        AlertDialog(
+                            onDismissRequest = { showNotificationDeniedDialog.value = false },
+                            icon = {
+                                Icon(Icons.Default.NotificationsOff, null, tint = DalliMuted)
+                            },
+                            title = {
+                                Text("Bildirishnomalar o'chiq", fontWeight = FontWeight.ExtraBold)
+                            },
+                            text = {
+                                Text(
+                                    "Siz buni o'chirib qo'ydingiz. Buyurtma holati va chegirmalar haqida bilmay qolishingiz mumkin.",
+                                    color = DalliMuted
+                                )
+                            },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    NotificationPermissionManager.openNotificationSettings(context)
+                                    showNotificationDeniedDialog.value = false
+                                }) {
+                                    Text("Qayta yoqish", color = DalliPrimary, fontWeight = FontWeight.Bold)
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showNotificationDeniedDialog.value = false }) {
+                                    Text("Yopish", color = DalliMuted)
+                                }
+                            }
+                        )
+                    }
                 }
             }
         }
     }
 
-    private fun requestNotificationPermission() {
+    fun requestNotificationPermission(onResult: () -> Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED
             ) {
-                requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
+                pendingNotificationNavigation = onResult
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                return
             }
         }
+        onResult()
     }
 }
 
