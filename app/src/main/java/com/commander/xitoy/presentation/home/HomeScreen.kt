@@ -58,9 +58,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -78,6 +80,7 @@ import com.commander.xitoy.domain.model.CartManager
 import com.commander.xitoy.domain.model.CurrencyRateManager
 import com.commander.xitoy.domain.model.FavoritesManager
 import com.commander.xitoy.domain.model.Product
+import com.commander.xitoy.domain.model.SeenOrdersManager
 import com.commander.xitoy.domain.model.SessionManager
 import com.commander.xitoy.presentation.common.OrderProgressBar
 import com.commander.xitoy.presentation.common.holatDisplay
@@ -101,7 +104,9 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Medal
 
 import com.composables.icons.lucide.Zap
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private val DeliveryGreen = Color(0xFF5EE29A)
 private val HitOrange = Color(0xFFF97316)
@@ -137,6 +142,9 @@ fun HomeScreen(
     val ordersState by ordersViewModel.state.collectAsState()
     var quickAddProduct by remember { mutableStateOf<Product?>(null) }
     var addedProductName by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+    val gridState = rememberLazyGridState()
+    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(addedProductName) {
         if (addedProductName != null) {
@@ -159,14 +167,33 @@ fun HomeScreen(
 
     val latestOrder: OrderItem? = (ordersState as? OrdersState.Success)?.orders?.firstOrNull()
     val bannerStage = latestOrder?.let { holatToStage(it.holat) } ?: 0
+    val isDelivered = latestOrder != null && holatToStage(latestOrder.holat) == 3
+    val shouldShowBanner = latestOrder != null && !(
+        isDelivered && SeenOrdersManager.isDeliveredOrderSeen(context, latestOrder.order_id)
+    )
+
+    // "Yetkazildi" banneri 3 soniya ko'rsatilgandan keyin avtomatik "ko'rildi" belgilanadi
+    if (shouldShowBanner && isDelivered) {
+        LaunchedEffect(latestOrder.order_id) {
+            delay(3000L)
+            SeenOrdersManager.markDeliveredOrderSeen(context, latestOrder.order_id)
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
-    PullToRefreshBox(
-        isRefreshing = isLoading,
-        onRefresh = { viewModel.refresh() },
-        modifier = Modifier.fillMaxSize()
-    ) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        ShopHeader(onTitleClick = {
+            coroutineScope.launch { gridState.animateScrollToItem(0) }
+        })
+        PullToRefreshBox(
+            isRefreshing = isLoading,
+            onRefresh = { viewModel.refresh() },
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ) {
         LazyVerticalGrid(
+            state = gridState,
             columns = GridCells.Fixed(2),
             modifier = Modifier.fillMaxSize().background(DalliBackground),
             verticalArrangement = Arrangement.spacedBy(11.dp),
@@ -174,16 +201,21 @@ fun HomeScreen(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 110.dp)
         ) {
             item(span = { GridItemSpan(maxLineSpan) }) {
-                ShopHeader()
-            }
-
-            item(span = { GridItemSpan(maxLineSpan) }) {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Spacer(Modifier.height(2.dp))
                     FlatSearchBar(value = searchQuery, onValueChange = { viewModel.onSearchQueryChange(it) })
                     HeroBanner(onClick = onSalesClick, totalCount = totalCount)
-                    if (latestOrder != null) {
-                        DeliveryBanner(order = latestOrder, stage = bannerStage, onClick = onOrdersClick)
+                    if (shouldShowBanner) {
+                        DeliveryBanner(
+                            order = latestOrder!!,
+                            stage = bannerStage,
+                            onClick = {
+                                if (isDelivered) {
+                                    SeenOrdersManager.markDeliveredOrderSeen(context, latestOrder.order_id)
+                                }
+                                onOrdersClick()
+                            }
+                        )
                     }
                 }
             }
@@ -194,7 +226,7 @@ fun HomeScreen(
 
             item(span = { GridItemSpan(maxLineSpan) }) {
                 SectionHeader(
-                    title = "Tezkor chegirmalar",
+                    title = "Tezkor takliflar",
                     action = "Hammasi",
                     onAction = onSalesClick,
                     leadingIcon = Lucide.Zap,
@@ -285,8 +317,9 @@ fun HomeScreen(
                     )
                 }
             }
-        }
-    }
+        }   // LazyVerticalGrid
+        }   // PullToRefreshBox
+    }       // Column
 
     AnimatedVisibility(
         visible = addedProductName != null,
@@ -328,7 +361,7 @@ fun HomeScreen(
 }
 
 @Composable
-private fun ShopHeader() {
+private fun ShopHeader(onTitleClick: () -> Unit = {}) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -337,10 +370,14 @@ private fun ShopHeader() {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 14.dp, bottom = 12.dp),
+                .padding(top = 6.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onTitleClick() }
+            ) {
                 Text(
                     text = "Dalli",
                     fontWeight = FontWeight.ExtraBold,
@@ -580,17 +617,6 @@ fun ProductCard(
     val isHot = product.soldCount >= 100
 
     val isTemporary = product.discountType == "vaqtinchalik" && !product.discountExpires.isNullOrBlank()
-    var remainingSeconds by remember(product.id) {
-        mutableStateOf(if (isTemporary) getRemainingSeconds(product.discountExpires!!) else 0L)
-    }
-    LaunchedEffect(product.id) {
-        if (isTemporary) {
-            while (remainingSeconds > 0L) {
-                delay(1000L)
-                remainingSeconds = getRemainingSeconds(product.discountExpires!!)
-            }
-        }
-    }
 
     Card(
         onClick = onClick,
@@ -736,17 +762,10 @@ fun ProductCard(
                     }
                 }
                 if (isTemporary) {
-                    if (remainingSeconds > 0L) {
-                        DiscountTimer(remainingSeconds = remainingSeconds, modifier = Modifier.fillMaxWidth())
-                    } else {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Icon(Lucide.CircleCheck, null, tint = Color.Gray, modifier = Modifier.size(13.dp))
-                            Text("Chegirma tugadi", color = Color.Gray, fontSize = 12.sp)
-                        }
-                    }
+                    CountdownText(
+                        discountExpires = product.discountExpires!!,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         }

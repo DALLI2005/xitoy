@@ -15,7 +15,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -29,6 +33,7 @@ import com.composables.icons.lucide.Timer
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
+import kotlinx.coroutines.delay
 
 fun getRemainingSeconds(expiresAt: String): Long {
     return try {
@@ -110,6 +115,33 @@ fun DiscountTimer(
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
             )
+        }
+    }
+}
+
+// Faqat timer matni o'z ichiga oladi — ProductCard'ning butun tanasi
+// qayta chizilmaydi, faqat shu kichik composable yangilanadi.
+@Composable
+fun CountdownText(discountExpires: String, modifier: Modifier = Modifier) {
+    var remainingSeconds by remember(discountExpires) {
+        mutableLongStateOf(getRemainingSeconds(discountExpires))
+    }
+    LaunchedEffect(discountExpires) {
+        while (remainingSeconds > 0L) {
+            delay(1000L)
+            remainingSeconds = getRemainingSeconds(discountExpires)
+        }
+    }
+    if (remainingSeconds > 0L) {
+        DiscountTimer(remainingSeconds = remainingSeconds, modifier = modifier)
+    } else {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = modifier
+        ) {
+            Icon(Lucide.Timer, null, tint = Color.Gray, modifier = Modifier.size(13.dp))
+            Text("Chegirma tugadi", color = Color.Gray, fontSize = 12.sp)
         }
     }
 }

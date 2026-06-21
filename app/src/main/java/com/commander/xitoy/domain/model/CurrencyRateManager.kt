@@ -12,25 +12,25 @@ import kotlin.math.abs
 /**
  * O'zbekiston Markaziy banki (CBU) ochiq API'sidan CNY (yuan) kursini oladi.
  * Endpoint: https://cbu.uz/uz/arkhiv-kursov-valyut/json/CNY/
- * Mavjud backend/Retrofit'ga tegmaydi — alohida, additiv.
+ * Har 30 daqiqada bir marta yangilanadi.
  */
 object CurrencyRateManager {
 
     data class CnyRate(
-        val somText: String,     // "1 752"
-        val percentText: String, // "0.42"
-        val isUp: Boolean        // ▲ yoki ▼
+        val somText: String,
+        val percentText: String,
+        val isUp: Boolean
     )
 
     private val _cnyRate = MutableStateFlow<CnyRate?>(null)
     val cnyRate: StateFlow<CnyRate?> = _cnyRate
 
-    @Volatile
-    private var loaded = false
+    private var lastLoadedAt: Long = 0L
+    private const val REFRESH_INTERVAL_MS = 30 * 60 * 1000L
 
-    suspend fun load() {
-        if (loaded) return
-        loaded = true
+    suspend fun load(force: Boolean = false) {
+        val now = System.currentTimeMillis()
+        if (!force && _cnyRate.value != null && now - lastLoadedAt < REFRESH_INTERVAL_MS) return
         try {
             val json = withContext(Dispatchers.IO) {
                 val conn = (URL("https://cbu.uz/uz/arkhiv-kursov-valyut/json/CNY/").openConnection()
@@ -42,7 +42,7 @@ object CurrencyRateManager {
                 conn.inputStream.bufferedReader().use { it.readText() }
             }
             val obj = JSONArray(json).getJSONObject(0)
-            val rate = obj.getString("Rate").toDouble()        // 1752.34
+            val rate = obj.getString("Rate").toDouble()
             val diff = obj.getString("Diff").toDoubleOrNull() ?: 0.0
             val prev = rate - diff
             val percent = if (prev != 0.0) (diff / prev) * 100.0 else 0.0
@@ -51,8 +51,9 @@ object CurrencyRateManager {
                 percentText = String.format("%.2f", abs(percent)),
                 isUp = diff >= 0
             )
+            lastLoadedAt = now
         } catch (_: Exception) {
-            loaded = false // keyingi safar qayta urinish uchun
+            // eski qiymat saqlanib qoladi
         }
     }
 
