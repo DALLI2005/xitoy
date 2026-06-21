@@ -173,7 +173,7 @@ async def confirm_login(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message_id = query.message.message_id
 
         async def _delete_welcome():
-            await asyncio.sleep(120)  # 2 daqiqa
+            await asyncio.sleep(60)  # 1 daqiqa
             try:
                 await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
             except Exception as e:
@@ -337,7 +337,7 @@ async def get_address(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sent_message_id = sent.message_id
 
     async def _delete_registration():
-        await asyncio.sleep(120)  # 2 daqiqa
+        await asyncio.sleep(60)  # 1 daqiqa
         try:
             await context.bot.delete_message(chat_id=sent_chat_id, message_id=sent_message_id)
         except Exception as e:
