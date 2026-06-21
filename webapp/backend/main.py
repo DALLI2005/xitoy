@@ -72,16 +72,12 @@ NOISE_TITLE_WORDS = [
     "sifat kafolati", "kichik narx", "iste'molchi", "ulgurji",
     # Tarjimada ko'p chiqadigan filler iboralar (testdan)
     "tezkor yetkazib berish", "bepul yetkazib berish", "tez yetkazish",
-    "tasodifiy", "bo'shashgan", "universal",
+    "tasodifiy", "bo'shashgan",
     "o'g'il bolalar va qizlar uchun",
     "erkaklar va ayollar uchun",
     "bahor va kuzgi",
     "yiqilishga qarshi",
-    "nafas oladigan",
     "silliq bo'lmagan",
-    "ko'p qirrali",
-    "ko'p funksiyali",
-    "yuqori darajadagi",
     "moda va",
 ]
 
@@ -470,12 +466,24 @@ def _shorten_title(text: str, max_words: int = 6, max_chars: int = 48) -> str:
     cleaned = re.sub(r'\b20[2-3]\d\s*(yilgi|yillik)?\b', '', first_part)
 
     # 3) NOISE_TITLE_WORDS keraksiz iboralarini olib tashlash (uzundan qisqaga tartiblangan)
+    original_word_count = len(first_part.split())
+    noise_cleaned = re.sub(r'\b20[2-3]\d\s*(yilgi|yillik)?\b', '', first_part)
+    noise_cleaned = re.sub(r'\s+', ' ', noise_cleaned)
     for w in sorted(NOISE_TITLE_WORDS, key=len, reverse=True):
-        cleaned = re.sub(re.escape(w), "", cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r'\s+', ' ', cleaned).strip(" -–—,.")
+        noise_cleaned = re.sub(re.escape(w), "", noise_cleaned, flags=re.IGNORECASE)
+    noise_cleaned = re.sub(r'\s+', ' ', noise_cleaned).strip(" -–—,.")
+    noise_word_count = len(noise_cleaned.split()) if noise_cleaned else 0
 
-    if not cleaned:
-        cleaned = first_part
+    MIN_CHARS = 8
+    MIN_WORD_RATIO = 0.3
+    if (not noise_cleaned
+            or len(noise_cleaned) < MIN_CHARS
+            or (original_word_count > 0
+                and noise_word_count / original_word_count < MIN_WORD_RATIO)):
+        # Tozalash haddan oshdi — asl birinchi qismni saqlash
+        cleaned = cleaned  # year-regex cleaned, noise o'chirilmagan
+    else:
+        cleaned = noise_cleaned
 
     def _trim_trailing(word_list: list[str]) -> list[str]:
         bad = {"uchun", "va", "bilan", "ham", "yoki", "esa", "bu"}
@@ -487,9 +495,9 @@ def _shorten_title(text: str, max_words: int = 6, max_chars: int = 48) -> str:
     # 4) So'z cheklanishidan oldin bog'lovchilarni tozalash
     words = _trim_trailing(cleaned.split())
 
-    # 5) So'z sonini cheklash
+    # 5) So'z sonini cheklash + kesimdan keyin yana trailing tekshiruv
     if len(words) > max_words:
-        words = words[:max_words]
+        words = _trim_trailing(words[:max_words])
     cleaned = " ".join(words)
 
     # 6) Belgi sonini cheklash (so'z o'rtasida kesilmasligi uchun)
@@ -500,7 +508,9 @@ def _shorten_title(text: str, max_words: int = 6, max_chars: int = 48) -> str:
         cleaned = " ".join(words2)
 
     cleaned = cleaned[0].upper() + cleaned[1:] if cleaned else cleaned
-    return cleaned or text[:max_chars]
+    if len(cleaned.strip()) < 3:
+        cleaned = text.strip()[:max_chars].rsplit(" ", 1)[0] or text.strip()[:max_chars]
+    return cleaned
 
 
 def _do_translate_sync(text: str) -> str:
