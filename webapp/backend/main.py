@@ -61,6 +61,18 @@ LOGIN_BOT_USERNAME = os.environ.get("LOGIN_BOT_USERNAME", "dalli_login_robot")
 
 CATEGORIES = ["Kiyim", "Elektronika", "Poyabzal", "Aksessuar", "Sport", "Uy uchun", "Boshqa"]
 
+# Sarlavha qisqartirish uchun keraksiz marketing so'zlari ro'yxati
+# (real tarjima natijalarini ko'rib, kengaytirish mumkin)
+NOISE_TITLE_WORDS = [
+    "yangi", "premium", "yuqori sifat", "yuqori sifatli",
+    "tezkor yetkazib berish", "bepul yetkazib berish",
+    "rasmiy", "original", "100%", "eng yaxshi", "maxsus",
+    "chegirma", "aksiya", "tavsiya etiladi", "mashhur",
+    "issiq sotuv", "ko'p sotiladigan", "trend",
+    "kichik narx", "arzon", "iste'molchi", "ulgurji",
+    "sifat kafolati", "tez yetkazish", "bepul",
+]
+
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
@@ -433,6 +445,60 @@ def require_super(user: dict = Depends(get_current_user)):
     if not user["is_superadmin"]:
         raise HTTPException(403, "Faqat superadmin uchun")
     return user
+
+
+def _shorten_title(text: str, max_words: int = 7, max_chars: int = 50) -> str:
+    import re
+    # 1) Birinchi vergul/nuqta/qavsgacha bo'lgan qismni olish
+    first_part = re.split(r'[,，。()（）\[\]【】|/]', text)[0].strip()
+    if not first_part:
+        first_part = text.strip()
+
+    # 2) NOISE_TITLE_WORDS ro'yxatidagi keraksiz so'zlarni olib tashlash
+    cleaned = first_part
+    for w in NOISE_TITLE_WORDS:
+        cleaned = re.sub(re.escape(w), "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip(" -–—,.")
+
+    if not cleaned:
+        cleaned = first_part
+
+    # 3) So'z sonini cheklash
+    words = cleaned.split()
+    if len(words) > max_words:
+        cleaned = " ".join(words[:max_words])
+
+    # 4) Belgi sonini cheklash (so'z o'rtasida kesilmasligi uchun)
+    if len(cleaned) > max_chars:
+        cleaned = cleaned[:max_chars].rsplit(" ", 1)[0]
+
+    cleaned = cleaned[0].upper() + cleaned[1:] if cleaned else cleaned
+    return cleaned or text[:max_chars]
+
+
+def _do_translate_sync(text: str) -> str:
+    params = urllib.parse.urlencode(
+        {"client": "gtx", "sl": "auto", "tl": "uz", "dt": "t", "q": text}
+    )
+    url = f"https://translate.googleapis.com/translate_a/single?{params}"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=10) as r:
+        data = json.loads(r.read())
+    return "".join(seg[0] for seg in data[0] if seg[0])
+
+
+@app.post("/admin/translate")
+async def translate_text(payload: dict, _: dict = Depends(get_current_user)):
+    text = (payload.get("text") or "").strip()
+    if not text:
+        raise HTTPException(400, "text bo'sh bo'lishi mumkin emas")
+    try:
+        translated_full = await asyncio.to_thread(_do_translate_sync, text)
+    except Exception as e:
+        log.warning("Tarjima xatoligi: %s", e)
+        raise HTTPException(502, f"Tarjima xizmati ishlamadi: {e}")
+    translated_short = _shorten_title(translated_full)
+    return {"translated_full": translated_full, "translated_short": translated_short}
 
 
 @app.get("/admin/settings")

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { ImagePlus, DollarSign, Tag, Percent, AlignLeft, CheckCircle2, AlertCircle, Loader2, RefreshCw, TrendingUp, Clock, Megaphone } from 'lucide-react'
+import { ImagePlus, DollarSign, Tag, Percent, AlignLeft, CheckCircle2, AlertCircle, Loader2, RefreshCw, TrendingUp, Clock, Megaphone, Languages } from 'lucide-react'
 import { api } from '../api'
 import PhotoUpload from '../components/PhotoUpload'
 import { hapticSuccess, hapticError } from '../telegram'
@@ -78,6 +78,7 @@ export default function AddProduct({ user }: Props) {
   const [variantEnabled, setVariantEnabled]   = useState(false)
   const [variantNames,   setVariantNames]     = useState<string[]>([])
   const [variantPrices,  setVariantPrices]    = useState<string[]>([])
+  const [translating,    setTranslating]      = useState(false)
   const toastTimer                    = useRef<ReturnType<typeof setTimeout>>()
 
   const categories = user.categories
@@ -147,6 +148,20 @@ export default function AddProduct({ user }: Props) {
   const breakdown = (yuanNum > 0 && cnyRate && form.category)
     ? calcBreakdown(yuanNum, cnyRate, config)
     : null
+
+  async function handleTranslateAndShorten() {
+    if (!form.name.trim()) return showToast('error', "Avval nom maydoniga matn kiriting")
+    setTranslating(true)
+    try {
+      const res = await api.translateAndShorten(form.name.trim())
+      set('name', res.translated_short)
+      showToast('success', "Tarjima va qisqartirish bajarildi")
+    } catch {
+      showToast('error', "Tarjima ishlamadi, qo'lda kiriting")
+    } finally {
+      setTranslating(false)
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -355,9 +370,28 @@ export default function AddProduct({ user }: Props) {
               value={form.name}
               onChange={e => set('name', e.target.value)}
               placeholder="Masalan: Adidas Ultraboost"
-              disabled={loading}
+              disabled={loading || translating}
               autoComplete="off"
             />
+            <div className="flex items-center justify-end px-1 mt-1">
+              <button
+                type="button"
+                onClick={handleTranslateAndShorten}
+                disabled={translating || loading || !form.name.trim()}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--accent)', padding: 4,
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  opacity: (!form.name.trim() || loading) ? 0.4 : 1,
+                }}
+              >
+                <Languages size={13} style={{ flexShrink: 0 }}
+                  className={translating ? 'animate-pulse' : ''} />
+                <span className="text-xs">
+                  {translating ? "Tarjima qilinmoqda…" : "Tarjima va qisqartirish"}
+                </span>
+              </button>
+            </div>
           </div>
 
           {/* Rate indicator */}

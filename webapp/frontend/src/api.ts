@@ -172,4 +172,11 @@ export const api = {
       method: 'DELETE',
       headers: headers(),
     }),
+
+  translateAndShorten: (text: string) =>
+    request<{ translated_full: string; translated_short: string }>('/admin/translate', {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ text }),
+    }),
 }
