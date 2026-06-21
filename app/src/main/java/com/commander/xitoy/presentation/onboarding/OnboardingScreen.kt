@@ -27,8 +27,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import kotlin.math.absoluteValue
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -54,8 +57,8 @@ private val onboardingPages = listOf(
     ),
     OnboardingPage(
         animationAsset = "onboarding/woman-shopping-online.json",
-        title = "Xitoydan to'g'ridan-to'g'ri",
-        description = "Eng arzon narxlarda, vositachisiz — yuan kursi bo'yicha aniq hisoblangan narxlar"
+        title = "Minglab mahsulot, bitta ilova",
+        description = "Kiyim-kechakdan elektronikagacha — kerakli narsangizni osongina toping"
     ),
     OnboardingPage(
         animationAsset = "onboarding/tracking-order-online.json",
@@ -99,11 +102,18 @@ fun OnboardingScreen(onFinish: () -> Unit) {
             state = pagerState,
             modifier = Modifier.weight(1f)
         ) { page ->
+            val pageOffset = ((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction).absoluteValue
+            val fraction = 1f - pageOffset.coerceIn(0f, 1f)
+            val pageScale = 0.85f + (1f - 0.85f) * fraction
+            val pageAlpha = 0.4f + (1f - 0.4f) * fraction
+
             val pageData = onboardingPages[page]
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 32.dp),
+                    .padding(horizontal = 32.dp)
+                    .scale(pageScale)
+                    .alpha(pageAlpha),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
