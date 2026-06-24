@@ -101,8 +101,11 @@ object AppModule {
     // 2. Repository ga Api ni ulab beramiz
     @Provides
     @Singleton
-    fun provideProductRepository(api: XitoyApi): ProductRepository {
-        return ProductRepositoryImpl(api)
+    fun provideProductRepository(
+        api: XitoyApi,
+        @ApplicationContext context: Context
+    ): ProductRepository {
+        return ProductRepositoryImpl(api, context)
     }
 
     // 3. Use Case ga Repository ni ulab beramiz
