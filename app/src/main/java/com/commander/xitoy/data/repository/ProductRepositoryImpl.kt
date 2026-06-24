@@ -8,7 +8,16 @@ class ProductRepositoryImpl(
     private val api: XitoyApi
 ) : ProductRepository {
 
+    // Xotira keshi — ilova ishlab turganda saqlanadi (repository @Singleton).
+    // Sahifa qayta ochilganda mahsulotlarni server kutmasdan darhol ko'rsatish uchun.
+    @Volatile
+    private var cachedProducts: List<Product>? = null
+
     override suspend fun getProducts(): List<Product> {
-        return api.getProducts(timestamp = System.currentTimeMillis())
+        val fresh = api.getProducts(timestamp = System.currentTimeMillis())
+        cachedProducts = fresh
+        return fresh
     }
+
+    override fun getCachedProducts(): List<Product>? = cachedProducts
 }

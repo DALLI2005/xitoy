@@ -12,6 +12,8 @@ import json
 import logging
 import urllib.parse
 import urllib.request
+import uuid
+from pathlib import Path
 from contextlib import asynccontextmanager
 from datetime import datetime
 from time import time
@@ -54,6 +56,8 @@ PAYMENT_CARD_NUMBER  = os.environ.get("PAYMENT_CARD_NUMBER", "")
 PAYMENT_CARD_HOLDER  = os.environ.get("PAYMENT_CARD_HOLDER", "")
 APPS_SCRIPT_URL      = os.environ.get("APPS_SCRIPT_URL", "")
 IMGBB_API_KEY        = os.environ.get("IMGBB_API_KEY", "")
+UPLOADS_DIR          = Path("/opt/xitoy_webapp/uploads")
+SITE_BASE_URL        = "https://admin.eliboyev.uz"
 DB_PATH         = "admins.db"
 
 # Login bot username (@ siz). Deep-link uchun.
@@ -672,6 +676,15 @@ async def imgbb_upload(image_bytes: bytes) -> str:
     return await asyncio.to_thread(_imgbb_upload, image_bytes)
 
 
+async def local_upload(image_bytes: bytes, subfolder: str = "products") -> str:
+    ext = "jpg"
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    save_path = UPLOADS_DIR / subfolder / filename
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    save_path.write_bytes(image_bytes)
+    return f"{SITE_BASE_URL}/uploads/{subfolder}/{filename}"
+
+
 # ── Helpers — Telegram notification ───────────────────────────────────────────
 def _tg_notify(text: str):
     payload = json.dumps({
@@ -1041,7 +1054,7 @@ async def upload_image(
         raise HTTPException(413, "Fayl 10MB dan katta bo'lmasligi kerak")
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(400, "Faqat rasm fayllari")
-    url = await imgbb_upload(content)
+    url = await local_upload(content, subfolder="products")
     return {"url": url}
 
 
@@ -1390,7 +1403,7 @@ async def upload_receipt(
     if len(content) > 20 * 1024 * 1024:
         raise HTTPException(413, "Fayl 20MB dan katta bo'lmasligi kerak")
 
-    photo_url = await imgbb_upload(content)
+    photo_url = await local_upload(content, subfolder="payments")
 
     await sheets_post({
         "action":   "updateOrderStatus",

@@ -72,12 +72,26 @@ class HomeViewModel @Inject constructor(
 
     private fun fetchProducts() {
         viewModelScope.launch {
-            _isLoading.value = true
+            // 1. AVVAL keshlangan ma'lumot bo'lsa, DARHOL ko'rsat (server kutmasdan).
+            //    Shu tarzda sahifa qayta ochilganda "qotish" yo'qoladi.
+            val cached = getProductsUseCase.getCached()
+            val hasCache = !cached.isNullOrEmpty()
+            if (hasCache) {
+                _products.value = cached!!
+                _isLoading.value = false // indikator ko'rsatilmaydi
+            } else {
+                _isLoading.value = true  // faqat birinchi marta (kesh yo'q) indikator
+            }
+
+            // 2. Keyin fonda serverdan yangisini ol (jimgina).
             _errorMessage.value = null
             try {
                 _products.value = getProductsUseCase()
             } catch (e: Exception) {
-                _errorMessage.value = e.message ?: "Noma'lum xatolik yuz berdi"
+                // Kesh bor bo'lsa, xato ko'rsatmaymiz — eski ma'lumot turaveradi.
+                if (!hasCache) {
+                    _errorMessage.value = e.message ?: "Noma'lum xatolik yuz berdi"
+                }
                 e.printStackTrace()
             } finally {
                 _isLoading.value = false
