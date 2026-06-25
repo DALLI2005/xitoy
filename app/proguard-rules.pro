@@ -1,21 +1,53 @@
 # Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
-#
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Stack trace uchun line number ma'lumotlarini saqlash
+-keepattributes SourceFile,LineNumberTable
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Hilt
+-keep class * extends dagger.hilt.android.internal.managers.* { *; }
+-keepclassmembers,allowobfuscation class * {
+    @dagger.hilt.android.AndroidEntryPoint <init>(...);
+}
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Retrofit
+-keepattributes Signature, InnerClasses, EnclosingMethod
+-keepattributes RuntimeVisibleAnnotations, RuntimeVisibleParameterAnnotations
+-keepclassmembers,allowshrinking,allowobfuscation interface * {
+    @retrofit2.http.* <methods>;
+}
+-dontwarn org.codehaus.mojo.animal_sniffer.IgnoreJRERequirement
+-dontwarn javax.annotation.**
+-dontwarn kotlin.Unit
+-dontwarn retrofit2.KotlinExtensions
+-dontwarn retrofit2.KotlinExtensions$*
+
+# Gson
+-keepattributes *Annotation*
+-keep class com.google.gson.** { *; }
+-keep class * extends com.google.gson.TypeAdapter
+-keep class * implements com.google.gson.TypeAdapterFactory
+-keep class * implements com.google.gson.JsonSerializer
+-keep class * implements com.google.gson.JsonDeserializer
+
+# Loyiha modellari (@SerializedName annotatsiyalari bilan)
+-keep class com.commander.xitoy.domain.model.** { *; }
+-keep class com.commander.xitoy.data.remote.** { *; }
+
+# Coroutines
+-keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
+-keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
+
+# Compose
+-keep class androidx.compose.** { *; }
+-dontwarn androidx.compose.**
+
+# Lottie
+-keep class com.airbnb.lottie.** { *; }
+-dontwarn com.airbnb.lottie.**
+
+# Firebase FCM
+-keep class com.google.firebase.** { *; }
+-dontwarn com.google.firebase.**
+
+# Har ehtimolga qarshi — barcha loyiha sinflari
+-keep class com.commander.xitoy.** { *; }
