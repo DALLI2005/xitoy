@@ -128,7 +128,7 @@ fun DetailsScreen(
     var added by remember(product.id) { mutableStateOf(false) }
 
     val favorites = FavoritesManager.favorites.collectAsState().value
-    val isFavorite = favorites.any { it.name == product.name }
+    val isFavorite = favorites.any { it.id == product.id }
     val cartCount = CartManager.cartItems.collectAsState().value.size
 
     val canAddToCart = availableSizes.isEmpty() || selectedSize != null
