@@ -283,7 +283,7 @@ fun HomeScreen(
                 }
                 else -> {
                     items(filteredProducts, key = { it.id }) { product ->
-                        val isFav = favorites.any { it.name == product.name }
+                        val isFav = favorites.any { it.id == product.id }
                         ProductCard(
                             product = product,
                             isFavorite = isFav,
