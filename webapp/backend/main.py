@@ -1368,6 +1368,45 @@ async def list_orders(telegram_id: str):
     )
 
 
+# ── /api/favorites (mijoz ilovasi) ───────────────────────────────────────────
+@app.get("/api/favorites")
+async def list_favorites(telegram_id: int):
+    """Foydalanuvchining sevimli mahsulotlari ro'yxati."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT product_id FROM favorites WHERE telegram_id = ? ORDER BY created_at DESC",
+            (telegram_id,)
+        ) as cur:
+            rows = await cur.fetchall()
+    product_ids = {str(r[0]) for r in rows}
+    all_products = await sheets_get()
+    return [p for p in all_products if str(p.get("id")) in product_ids]
+
+
+@app.post("/api/favorites/{product_id}")
+async def add_favorite(product_id: str, telegram_id: int):
+    """Mahsulotni sevimlilarga qo'shish."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT OR IGNORE INTO favorites (telegram_id, product_id) VALUES (?, ?)",
+            (telegram_id, product_id)
+        )
+        await db.commit()
+    return {"ok": True, "product_id": product_id}
+
+
+@app.delete("/api/favorites/{product_id}")
+async def remove_favorite(product_id: str, telegram_id: int):
+    """Mahsulotni sevimlilardan olib tashlash."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "DELETE FROM favorites WHERE telegram_id = ? AND product_id = ?",
+            (telegram_id, product_id)
+        )
+        await db.commit()
+    return {"ok": True, "product_id": product_id}
+
+
 @app.get("/order/payment-card")
 async def get_payment_card():
     """To'lov kartasi ma'lumoti (.env dan o'qiladi)."""
