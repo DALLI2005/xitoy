@@ -514,7 +514,7 @@ fun DetailsScreen(
                                 Box(modifier = Modifier.width(160.dp)) {
                                     ProductCard(
                                         product = sp,
-                                        isFavorite = favorites.any { it.name == sp.name },
+                                        isFavorite = favorites.any { it.id == sp.id },
                                         onClick = { onProductClick(sp) }
                                     )
                                 }
