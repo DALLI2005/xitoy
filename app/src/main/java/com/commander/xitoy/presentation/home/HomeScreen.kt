@@ -409,6 +409,21 @@ private fun ShopHeader(
                     color = DalliPrimary
                 )
             }
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { onFavoritesClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Lucide.Heart,
+                    contentDescription = "Sevimlilar",
+                    tint = DalliText,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(Modifier.width(8.dp))
             CnyRatePill()
         }
         HorizontalDivider(color = DalliLine, thickness = 1.dp)
