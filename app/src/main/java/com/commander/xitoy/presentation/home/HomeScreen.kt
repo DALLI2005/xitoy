@@ -374,7 +374,10 @@ fun HomeScreen(
 }
 
 @Composable
-private fun ShopHeader(onTitleClick: () -> Unit = {}) {
+private fun ShopHeader(
+    onTitleClick: () -> Unit = {},
+    onFavoritesClick: () -> Unit = {}
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
