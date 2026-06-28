@@ -194,9 +194,10 @@ fun HomeScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
     Column(modifier = Modifier.fillMaxSize()) {
-        ShopHeader(onTitleClick = {
-            coroutineScope.launch { gridState.animateScrollToItem(0) }
-        })
+        ShopHeader(
+            onTitleClick = { coroutineScope.launch { gridState.animateScrollToItem(0) } },
+            onFavoritesClick = onFavoritesClick
+        )
         PullToRefreshBox(
             isRefreshing = isLoading,
             onRefresh = { viewModel.refresh() },
