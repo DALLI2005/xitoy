@@ -89,4 +89,19 @@ interface OrderApi {
 
     @POST("cart/cancel-reminder")
     suspend fun cancelCartReminder(@Body request: CartCancelRequest): Map<String, String>
+
+    @GET("api/favorites")
+    suspend fun getFavorites(@Query("telegram_id") telegramId: String): List<Product>
+
+    @POST("api/favorites/{productId}")
+    suspend fun addFavorite(
+        @Path("productId") productId: String,
+        @Query("telegram_id") telegramId: String
+    ): Map<String, Any>
+
+    @DELETE("api/favorites/{productId}")
+    suspend fun removeFavorite(
+        @Path("productId") productId: String,
+        @Query("telegram_id") telegramId: String
+    ): Map<String, Any>
 }
