@@ -104,6 +104,13 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    private fun loadFavorites() {
+        viewModelScope.launch {
+            val tid = SessionManager.session.value?.telegramId ?: return@launch
+            FavoritesManager.loadFavorites(orderApi, tid)
+        }
+    }
+
     private fun startPolling() {
         viewModelScope.launch {
             while (true) {
