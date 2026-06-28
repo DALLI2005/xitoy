@@ -286,6 +286,17 @@ async def init_db():
                 created_at TEXT    DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS favorites (
+                telegram_id  INTEGER NOT NULL,
+                product_id   TEXT    NOT NULL,
+                created_at   INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+                PRIMARY KEY (telegram_id, product_id)
+            )
+        """)
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(telegram_id)"
+        )
         # Superadmin — barcha kategoriyalar
         await db.execute("""
             INSERT OR IGNORE INTO admins (telegram_id, name, categories)
