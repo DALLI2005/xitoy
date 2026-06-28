@@ -64,6 +64,7 @@ class HomeViewModel @Inject constructor(
     init {
         fetchProducts()
         startPolling()
+        loadFavorites()
     }
 
     fun onSearchQueryChange(query: String) {
