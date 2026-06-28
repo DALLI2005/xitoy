@@ -111,6 +111,7 @@ import com.commander.xitoy.ui.theme.DalliText
 import com.commander.xitoy.ui.theme.DalliTextSecondary
 import com.composables.icons.lucide.CircleCheck
 import com.composables.icons.lucide.Flame
+import com.composables.icons.lucide.Heart
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Medal
 
