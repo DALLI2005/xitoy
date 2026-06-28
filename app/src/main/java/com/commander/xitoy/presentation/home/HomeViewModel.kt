@@ -2,7 +2,10 @@ package com.commander.xitoy.presentation.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.commander.xitoy.data.remote.OrderApi
+import com.commander.xitoy.domain.model.FavoritesManager
 import com.commander.xitoy.domain.model.Product
+import com.commander.xitoy.domain.model.SessionManager
 import com.commander.xitoy.domain.use_case.GetProductsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
@@ -19,7 +22,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val getProductsUseCase: GetProductsUseCase
+    private val getProductsUseCase: GetProductsUseCase,
+    private val orderApi: OrderApi
 ) : ViewModel() {
 
     private val _products = MutableStateFlow<List<Product>>(emptyList())
