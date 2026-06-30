@@ -61,6 +61,7 @@ import com.commander.xitoy.presentation.favorites.FavoritesScreen
 import com.commander.xitoy.presentation.home.HomeScreen
 import com.commander.xitoy.presentation.home.HomeViewModel
 import com.commander.xitoy.ui.theme.DalliPrimary
+import com.commander.xitoy.ui.theme.DalliPrimaryDark
 import com.commander.xitoy.ui.theme.DalliSurface
 import com.commander.xitoy.ui.theme.DalliText
 
