@@ -37,6 +37,7 @@ class LoginViewModel @Inject constructor(
     val openUrl: StateFlow<String?> = _openUrl
 
     private var pollingJob: Job? = null
+    private var lastTelegramUrl: String? = null
 
     fun startLogin() {
         pollingJob?.cancel()
@@ -44,6 +45,7 @@ class LoginViewModel @Inject constructor(
         pollingJob = viewModelScope.launch {
             try {
                 val start = authApi.authStart()
+                lastTelegramUrl = start.telegramUrl
                 _openUrl.value = start.telegramUrl       // ekran Telegramni ochadi
                 _uiState.value = LoginUiState.Waiting
                 pollConfirmation(start.loginToken)
