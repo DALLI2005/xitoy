@@ -765,7 +765,7 @@ fun ProductCard(
     Card(
         onClick = onClick,
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = DalliSurface),
         border = BorderStroke(1.dp, if (rank != null) rankBorderColor else DalliLine),
         modifier = Modifier.fillMaxWidth()
@@ -776,7 +776,7 @@ fun ProductCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(1f)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(16.dp))
             ) {
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
