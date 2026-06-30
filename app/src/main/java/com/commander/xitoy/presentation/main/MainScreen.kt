@@ -76,7 +76,7 @@ private fun CustomNavTab(
     onClick: () -> Unit
 ) {
     val scale by animateFloatAsState(
-        targetValue = if (selected) 1.02f else 1f,
+        targetValue = if (selected) 1.03f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessMedium
@@ -87,8 +87,27 @@ private fun CustomNavTab(
     Column(
         modifier = modifier
             .scale(scale)
-            .clip(RoundedCornerShape(18.dp))
-            .background(if (selected) DalliPrimary else DalliSurface)
+            .then(
+                if (selected) {
+                    Modifier
+                        .shadow(
+                            elevation = 10.dp,
+                            shape = RoundedCornerShape(16.dp),
+                            ambientColor = DalliPrimary.copy(alpha = 0.4f),
+                            spotColor = DalliPrimary.copy(alpha = 0.5f)
+                        )
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(DalliPrimary, DalliPrimaryDark)
+                            )
+                        )
+                } else {
+                    Modifier
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color.Transparent)
+                }
+            )
             .clickable { onClick() }
             .padding(vertical = 10.dp, horizontal = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
