@@ -3,6 +3,7 @@ package com.commander.xitoy.presentation.login
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,11 +16,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.TouchApp
+import androidx.compose.material3.BorderStroke as M3BorderStroke
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import com.commander.xitoy.presentation.common.DalliLoadingIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -32,6 +39,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -40,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.commander.xitoy.R
+import com.commander.xitoy.presentation.common.DalliLoadingIndicator
 import com.commander.xitoy.ui.theme.DalliBackground
 import com.commander.xitoy.ui.theme.DalliMuted
 import com.commander.xitoy.ui.theme.DalliPrimary
@@ -50,7 +59,6 @@ import com.commander.xitoy.ui.theme.DalliText
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.RefreshCw
 import com.composables.icons.lucide.Send
-import com.composables.icons.lucide.TimerOff
 
 @Composable
 fun LoginScreen(
@@ -200,32 +208,9 @@ fun LoginScreen(
                 }
 
                 is LoginUiState.Timeout -> {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(Lucide.TimerOff, null, tint = DalliText, modifier = Modifier.size(20.dp))
-                        Text(
-                            text = "Vaqt tugadi",
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = DalliText,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        text = "Tasdiqlash kelmadi. Qaytadan urinib ko'ring.",
-                        fontSize = 13.5.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = DalliMuted,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(Modifier.height(20.dp))
-                    GradientLoginButton(
-                        text = "Qaytadan urinish",
-                        icon = { Icon(Lucide.RefreshCw, null, tint = Color.White, modifier = Modifier.size(18.dp)) },
-                        onClick = { viewModel.startLogin() }
+                    TimeoutHelp(
+                        onRetryFromStart = { viewModel.startLogin() },
+                        onReopenTelegram = { viewModel.reopenTelegram() }
                     )
                 }
 
@@ -248,6 +233,115 @@ fun LoginScreen(
                         }) else null,
                         onClick = { viewModel.startLogin() }
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TimeoutHelp(
+    onRetryFromStart: () -> Unit,
+    onReopenTelegram: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            imageVector = Icons.Default.Schedule,
+            contentDescription = null,
+            tint = DalliMuted,
+            modifier = Modifier.size(52.dp)
+        )
+        Spacer(Modifier.height(14.dp))
+        Text(
+            "Vaqt tugadi",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = DalliText
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "2 daqiqa ichida tasdiqlanmadi. Quyidagilardan birini sinab ko'ring:",
+            fontSize = 13.5.sp,
+            color = DalliMuted,
+            textAlign = TextAlign.Center,
+            lineHeight = 20.sp
+        )
+        Spacer(Modifier.height(20.dp))
+
+        HelpOption(
+            icon = Icons.Default.OpenInNew,
+            title = "Telegram ochilmadimi?",
+            description = "Qayta urinib, Telegram havolasini ochishga harakat qiling",
+            buttonText = "Telegramni ochish",
+            onClick = onReopenTelegram
+        )
+
+        Spacer(Modifier.height(10.dp))
+
+        HelpOption(
+            icon = Icons.Default.TouchApp,
+            title = "Botda tugmani bosdingizmi?",
+            description = "Telegram'da @dalli_login_robot ga o'tib, \"✅ Kirishni tasdiqlash\" tugmasini bosing",
+            buttonText = null,
+            onClick = {}
+        )
+
+        Spacer(Modifier.height(20.dp))
+
+        Button(
+            onClick = onRetryFromStart,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(54.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = DalliPrimary)
+        ) {
+            Text(
+                "Qaytadan boshlash",
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun HelpOption(
+    icon: ImageVector,
+    title: String,
+    description: String,
+    buttonText: String?,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(DalliSurface)
+            .padding(16.dp)
+    ) {
+        Column {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(icon, null, tint = DalliPrimary, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(title, fontWeight = FontWeight.Bold, color = DalliText, fontSize = 14.sp)
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(description, color = DalliMuted, fontSize = 13.sp, lineHeight = 18.sp)
+            if (buttonText != null) {
+                Spacer(Modifier.height(10.dp))
+                OutlinedButton(
+                    onClick = onClick,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.5.dp, DalliPrimary),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = DalliPrimary)
+                ) {
+                    Text(buttonText, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
             }
         }
