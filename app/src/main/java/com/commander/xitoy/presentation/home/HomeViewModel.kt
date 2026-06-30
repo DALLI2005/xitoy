@@ -126,6 +126,14 @@ class HomeViewModel @Inject constructor(
         _searchQuery.value = query
     }
 
+    fun updateFilter(filter: FilterState) {
+        _filterState.value = filter
+    }
+
+    fun resetFilter() {
+        _filterState.value = FilterState()
+    }
+
     fun refresh() {
         fetchProducts()
     }
