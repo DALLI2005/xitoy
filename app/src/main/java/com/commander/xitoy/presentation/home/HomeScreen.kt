@@ -155,10 +155,12 @@ fun HomeScreen(
     val errorMessage = viewModel.errorMessage.collectAsState().value
     val favorites = FavoritesManager.favorites.collectAsState().value
     val searchQuery = viewModel.searchQuery.collectAsState().value
+    val filterState by viewModel.filterState.collectAsState()
     val session by SessionManager.session.collectAsState()
     val ordersState by ordersViewModel.state.collectAsState()
     var quickAddProduct by remember { mutableStateOf<Product?>(null) }
     var addedProductName by remember { mutableStateOf<String?>(null) }
+    var showFilterSheet by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val gridState = rememberLazyGridState()
     val coroutineScope = rememberCoroutineScope()
