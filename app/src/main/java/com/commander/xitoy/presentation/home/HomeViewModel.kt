@@ -1,5 +1,25 @@
 package com.commander.xitoy.presentation.home
 
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.commander.xitoy.data.remote.OrderApi
+import com.commander.xitoy.domain.model.FavoritesManager
+import com.commander.xitoy.domain.model.Product
+import com.commander.xitoy.domain.model.SessionManager
+import com.commander.xitoy.domain.use_case.GetProductsUseCase
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
 enum class SortOption(val label: String) {
     NEWEST("Eng yangi"),
     PRICE_ASC("Eng arzon"),
@@ -26,26 +46,6 @@ data class FilterState(
             onlyDiscounted
         ).count { it }
 }
-
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import com.commander.xitoy.data.remote.OrderApi
-import com.commander.xitoy.domain.model.FavoritesManager
-import com.commander.xitoy.domain.model.Product
-import com.commander.xitoy.domain.model.SessionManager
-import com.commander.xitoy.domain.use_case.GetProductsUseCase
-import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onStart
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -112,7 +112,6 @@ class HomeViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
 
-    // Xatoni ushlab, dizaynga uzatish uchun maxsus o'zgaruvchi
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage
 
@@ -140,23 +139,19 @@ class HomeViewModel @Inject constructor(
 
     private fun fetchProducts() {
         viewModelScope.launch {
-            // 1. AVVAL keshlangan ma'lumot bo'lsa, DARHOL ko'rsat (server kutmasdan).
-            //    Shu tarzda sahifa qayta ochilganda "qotish" yo'qoladi.
             val cached = getProductsUseCase.getCached()
             val hasCache = !cached.isNullOrEmpty()
             if (hasCache) {
                 _products.value = cached!!
-                _isLoading.value = false // indikator ko'rsatilmaydi
+                _isLoading.value = false
             } else {
-                _isLoading.value = true  // faqat birinchi marta (kesh yo'q) indikator
+                _isLoading.value = true
             }
 
-            // 2. Keyin fonda serverdan yangisini ol (jimgina).
             _errorMessage.value = null
             try {
                 _products.value = getProductsUseCase()
             } catch (e: Exception) {
-                // Kesh bor bo'lsa, xato ko'rsatmaymiz — eski ma'lumot turaveradi.
                 if (!hasCache) {
                     _errorMessage.value = e.message ?: "Noma'lum xatolik yuz berdi"
                 }
@@ -177,7 +172,7 @@ class HomeViewModel @Inject constructor(
     private fun startPolling() {
         viewModelScope.launch {
             while (true) {
-                delay(30_000L) // 30 soniyada bir yangilash
+                delay(30_000L)
                 try {
                     val fresh = getProductsUseCase()
                     if (fresh != _products.value) {
