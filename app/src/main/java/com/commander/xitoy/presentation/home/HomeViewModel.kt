@@ -58,6 +58,9 @@ class HomeViewModel @Inject constructor(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery
 
+    private val _filterState = MutableStateFlow(FilterState())
+    val filterState: StateFlow<FilterState> = _filterState
+
     val allProductsCount: StateFlow<Int> = _products
         .map { it.size }
         .stateIn(
@@ -68,13 +71,38 @@ class HomeViewModel @Inject constructor(
 
     val filteredProducts: StateFlow<List<Product>> = combine(
         _products,
-        _searchQuery.debounce(300).onStart { emit("") }
-    ) { products, query ->
-        if (query.isBlank()) products
-        else products.filter { product ->
-            product.name.contains(query, ignoreCase = true) ||
-                    product.category.contains(query, ignoreCase = true)
+        _searchQuery.debounce(300).onStart { emit("") },
+        _filterState
+    ) { products, query, filter ->
+        var result = products
+
+        if (query.isNotBlank()) {
+            result = result.filter { product ->
+                product.name.contains(query, ignoreCase = true) ||
+                        product.category.contains(query, ignoreCase = true)
+            }
         }
+
+        if (filter.selectedCategories.isNotEmpty()) {
+            result = result.filter { it.category in filter.selectedCategories }
+        }
+
+        result = result.filter { product ->
+            product.price.toFloat() in filter.priceRange
+        }
+
+        if (filter.onlyDiscounted) {
+            result = result.filter { it.discountPercent > 0 }
+        }
+
+        result = when (filter.sortBy) {
+            SortOption.NEWEST       -> result.sortedByDescending { it.id }
+            SortOption.PRICE_ASC    -> result.sortedBy { it.price }
+            SortOption.PRICE_DESC   -> result.sortedByDescending { it.price }
+            SortOption.BEST_SELLING -> result.sortedByDescending { it.soldCount }
+        }
+
+        result
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
