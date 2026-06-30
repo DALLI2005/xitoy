@@ -95,6 +95,11 @@ class LoginViewModel @Inject constructor(
         _openUrl.value = null
     }
 
+    // Timeout holatida oxirgi Telegram havolasini qayta ochish
+    fun reopenTelegram() {
+        _openUrl.value = lastTelegramUrl
+    }
+
     fun reset() {
         pollingJob?.cancel()
         _uiState.value = LoginUiState.Idle
