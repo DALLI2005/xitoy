@@ -65,11 +65,6 @@ private val onboardingPages = listOf(
         animationAsset = "onboarding/tracking-order-online.json",
         title = "Har bir qadamni kuzating",
         description = "Buyurtma berildi → tasdiqlandi → yo'lda → yetkazildi — barchasi real vaqtda ko'rinadi"
-    ),
-    OnboardingPage(
-        animationAsset = "onboarding/delivery-service.json",
-        title = "Bir bosishda buyurtma",
-        description = "Rang va o'lchamni tanlang, savatga qo'shing, ilova ichida xavfsiz to'lov qiling"
     )
 )
 
