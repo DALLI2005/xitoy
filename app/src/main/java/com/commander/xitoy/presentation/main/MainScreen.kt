@@ -64,6 +64,78 @@ import com.commander.xitoy.ui.theme.DalliText
 
 data class BottomNavItem(val name: String, val route: String, val icon: ImageVector)
 
+@Composable
+private fun CustomNavTab(
+    item: BottomNavItem,
+    selected: Boolean,
+    cartCount: Int,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val scale by animateFloatAsState(
+        targetValue = if (selected) 1.02f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "tab_scale_${item.route}"
+    )
+
+    Column(
+        modifier = modifier
+            .scale(scale)
+            .clip(RoundedCornerShape(18.dp))
+            .background(if (selected) DalliPrimary else DalliSurface)
+            .clickable { onClick() }
+            .padding(vertical = 10.dp, horizontal = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        val contentColor = if (selected) Color.White else DalliText
+
+        Box(contentAlignment = Alignment.Center) {
+            if (item.route == "cart" && cartCount > 0) {
+                BadgedBox(
+                    badge = {
+                        Badge(
+                            containerColor = if (selected) Color.White else DalliPrimary,
+                            contentColor = if (selected) DalliPrimary else Color.White
+                        ) {
+                            Text(
+                                text = if (cartCount > 99) "99+" else "$cartCount",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
+                    }
+                ) {
+                    Icon(
+                        item.icon,
+                        contentDescription = item.name,
+                        tint = contentColor,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            } else {
+                Icon(
+                    item.icon,
+                    contentDescription = item.name,
+                    tint = contentColor,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+        }
+
+        Text(
+            text = item.name,
+            fontSize = 10.sp,
+            fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold,
+            color = contentColor,
+            maxLines = 1
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
