@@ -190,8 +190,18 @@ fun MainScreen(
                     .padding(horizontal = 12.dp, vertical = 10.dp)
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .shadow(
+                            elevation = 16.dp,
+                            shape = RoundedCornerShape(28.dp),
+                            ambientColor = DalliPrimary.copy(alpha = 0.08f),
+                            spotColor = DalliPrimary.copy(alpha = 0.12f)
+                        )
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(DalliSurface)
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     navItems.forEach { item ->
                         val selected = currentRoute == item.route
