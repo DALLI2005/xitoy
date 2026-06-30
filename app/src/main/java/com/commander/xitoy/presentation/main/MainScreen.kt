@@ -105,78 +105,35 @@ fun MainScreen(
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            Surface(
-                color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 12.dp
-            ) {
-                NavigationBar(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = DalliPrimary,
-                    tonalElevation = 0.dp
-                ) {
-                    val navBackStackEntry by bottomNavController.currentBackStackEntryAsState()
-                    val currentRoute = navBackStackEntry?.destination?.route
+            val navBackStackEntry by bottomNavController.currentBackStackEntryAsState()
+            val currentRoute = navBackStackEntry?.destination?.route
 
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.background)
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     navItems.forEach { item ->
                         val selected = currentRoute == item.route
-                        val iconScale by animateFloatAsState(
-                            targetValue = if (selected) 1.18f else 1f,
-                            animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness    = Spring.StiffnessMediumLow
-                            ),
-                            label = "icon_scale_${item.route}"
-                        )
-                        NavigationBarItem(
-                            icon = {
-                                if (item.route == "cart" && cartCount > 0) {
-                                    BadgedBox(badge = {
-                                        Badge(containerColor = DalliPrimary) {
-                                            Text(
-                                                text = if (cartCount > 99) "99+" else "$cartCount",
-                                                color = Color.White,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontWeight = FontWeight.ExtraBold
-                                            )
-                                        }
-                                    }) {
-                                        Icon(
-                                            item.icon,
-                                            contentDescription = item.name,
-                                            modifier = Modifier.scale(iconScale)
-                                        )
-                                    }
-                                } else {
-                                    Icon(
-                                        item.icon,
-                                        contentDescription = item.name,
-                                        modifier = Modifier.scale(iconScale)
-                                    )
-                                }
-                            },
-                            label = {
-                                Text(
-                                    text = item.name,
-                                    fontSize = 10.sp,
-                                    maxLines = 1,
-                                    fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold
-                                )
-                            },
+                        CustomNavTab(
+                            item = item,
                             selected = selected,
+                            cartCount = if (item.route == "cart") cartCount else 0,
+                            modifier = Modifier.weight(1f),
                             onClick = {
                                 bottomNavController.navigate(item.route) {
-                                    popUpTo(bottomNavController.graph.findStartDestination().id) { saveState = true }
+                                    popUpTo(bottomNavController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
                                     launchSingleTop = true
                                     restoreState = true
                                 }
-                            },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = DalliPrimary,
-                                selectedTextColor = DalliPrimary,
-                                unselectedIconColor = DalliMuted,
-                                unselectedTextColor = DalliMuted,
-                                indicatorColor = DalliPrimary.copy(alpha = 0.10f)
-                            )
+                            }
                         )
                     }
                 }
