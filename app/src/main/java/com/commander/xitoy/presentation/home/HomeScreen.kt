@@ -278,7 +278,52 @@ fun HomeScreen(
             item(span = { GridItemSpan(maxLineSpan) }) {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Spacer(Modifier.height(2.dp))
-                    FlatSearchBar(value = searchQuery, onValueChange = { viewModel.onSearchQueryChange(it) })
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            FlatSearchBar(
+                                value = searchQuery,
+                                onValueChange = { viewModel.onSearchQueryChange(it) }
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(50.dp)
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(if (filterState.isActive) DalliPrimary else DalliSurface)
+                                .border(
+                                    width = 1.dp,
+                                    color = if (filterState.isActive) DalliPrimary else DalliLine,
+                                    shape = RoundedCornerShape(14.dp)
+                                )
+                                .clickable { showFilterSheet = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            BadgedBox(badge = {
+                                if (filterState.activeCount > 0) {
+                                    Badge(
+                                        containerColor = Color.White,
+                                        contentColor = DalliPrimary
+                                    ) {
+                                        Text(
+                                            "${filterState.activeCount}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.ExtraBold
+                                        )
+                                    }
+                                }
+                            }) {
+                                Icon(
+                                    Icons.Default.Tune,
+                                    contentDescription = "Filter",
+                                    tint = if (filterState.isActive) Color.White else DalliText,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                        }
+                    }
                     HeroBanner(onClick = onSalesClick, totalCount = totalCount)
                     if (shouldShowBanner) {
                         DeliveryBanner(
