@@ -466,6 +466,22 @@ fun HomeScreen(
             )
         }
     }
+    if (showFilterSheet) {
+        FilterBottomSheet(
+            currentFilter = filterState,
+            availableCategories = listOf(
+                "Aksessuar", "Kiyim", "Elektronika",
+                "Boshqa", "Sport", "Poyabzal", "Uy uchun"
+            ),
+            minPrice = 0f,
+            maxPrice = 1_000_000f,
+            onApply = { newFilter ->
+                viewModel.updateFilter(newFilter)
+                showFilterSheet = false
+            },
+            onDismiss = { showFilterSheet = false }
+        )
+    }
     } // Box end
 
     quickAddProduct?.let { product ->
