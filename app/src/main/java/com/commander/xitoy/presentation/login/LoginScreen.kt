@@ -271,7 +271,7 @@ private fun TimeoutHelp(
         Spacer(Modifier.height(20.dp))
 
         HelpOption(
-            icon = Icons.Default.OpenInNew,
+            icon = Icons.AutoMirrored.Filled.OpenInNew,
             title = "Telegram ochilmadimi?",
             description = "Qayta urinib, Telegram havolasini ochishga harakat qiling",
             buttonText = "Telegramni ochish",
