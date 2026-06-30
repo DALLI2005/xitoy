@@ -215,6 +215,61 @@ fun HomeScreen(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 110.dp)
         ) {
             item(span = { GridItemSpan(maxLineSpan) }) {
+                val ism = session?.fullname?.takeIf { it.isNotBlank() }
+                    ?: session?.ism?.takeIf { it.isNotBlank() }
+                    ?: ""
+                val firstName = ism.split(" ").firstOrNull()?.takeIf { it.isNotBlank() } ?: ""
+                val avatarLetter = firstName.firstOrNull()?.uppercase() ?: "D"
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp, bottom = 4.dp)
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(DalliSurface)
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(DalliPrimary, DalliPrimaryDark)
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = avatarLetter,
+                            color = Color.White,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (firstName.isNotBlank()) "Salom, $firstName" else "Xush kelibsiz",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = DalliText,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = "Rishton, Farg'ona",
+                            fontSize = 13.sp,
+                            color = DalliMuted,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            item(span = { GridItemSpan(maxLineSpan) }) {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Spacer(Modifier.height(2.dp))
                     FlatSearchBar(value = searchQuery, onValueChange = { viewModel.onSearchQueryChange(it) })
