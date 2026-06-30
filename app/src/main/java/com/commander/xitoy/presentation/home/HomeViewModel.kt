@@ -1,5 +1,32 @@
 package com.commander.xitoy.presentation.home
 
+enum class SortOption(val label: String) {
+    NEWEST("Eng yangi"),
+    PRICE_ASC("Eng arzon"),
+    PRICE_DESC("Eng qimmat"),
+    BEST_SELLING("Eng ko'p sotilgan")
+}
+
+data class FilterState(
+    val sortBy: SortOption = SortOption.NEWEST,
+    val selectedCategories: Set<String> = emptySet(),
+    val priceRange: ClosedFloatingPointRange<Float> = 0f..1_000_000f,
+    val onlyDiscounted: Boolean = false
+) {
+    val isActive: Boolean
+        get() = sortBy != SortOption.NEWEST ||
+                selectedCategories.isNotEmpty() ||
+                priceRange != 0f..1_000_000f ||
+                onlyDiscounted
+
+    val activeCount: Int
+        get() = listOf(
+            selectedCategories.isNotEmpty(),
+            priceRange != 0f..1_000_000f,
+            onlyDiscounted
+        ).count { it }
+}
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.commander.xitoy.data.remote.OrderApi
