@@ -115,6 +115,7 @@ import com.commander.xitoy.ui.theme.DalliPrimaryDark
 import com.commander.xitoy.ui.theme.DalliPrimarySoft
 import com.commander.xitoy.ui.theme.DalliSuccess
 import com.commander.xitoy.ui.theme.DalliSurface
+import com.commander.xitoy.ui.theme.DalliTeal
 import com.commander.xitoy.ui.theme.DalliText
 import com.commander.xitoy.ui.theme.DalliTextSecondary
 import com.composables.icons.lucide.CircleCheck
