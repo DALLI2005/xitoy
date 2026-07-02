@@ -86,6 +86,27 @@ private fun CustomNavTab(
         label = "tab_scale_${item.route}"
     )
 
+    // Tab tanlanganda yoki savatga mahsulot tushganda ikonka yumshoq sakraydi
+    val iconPop = remember { Animatable(1f) }
+    var prevSelected by remember { mutableStateOf(selected) }
+    var prevCartCount by remember { mutableStateOf(cartCount) }
+    LaunchedEffect(selected, cartCount) {
+        val becameSelected = selected && !prevSelected
+        val cartGrew = item.route == "cart" && cartCount > prevCartCount
+        prevSelected = selected
+        prevCartCount = cartCount
+        if (becameSelected || cartGrew) {
+            iconPop.snapTo(if (cartGrew) 0.6f else 0.8f)
+            iconPop.animateTo(
+                1f,
+                spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMedium
+                )
+            )
+        }
+    }
+
     Column(
         modifier = modifier
             .scale(scale)
