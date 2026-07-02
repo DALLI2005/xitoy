@@ -1084,14 +1084,16 @@ fun ProductCard(
                         .size(28.dp)
                         .clip(CircleShape)
                         .background(Color.White.copy(alpha = 0.92f))
-                        .clickable { FavoritesManager.toggle(product) },
+                        .clickable { haptic(); FavoritesManager.toggle(product) },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                         contentDescription = null,
                         tint = if (isFavorite) DalliAccent else DalliMuted,
-                        modifier = Modifier.size(14.dp)
+                        modifier = Modifier
+                            .size(14.dp)
+                            .scale(favScale.value)
                     )
                 }
                 if (rank != null) {
