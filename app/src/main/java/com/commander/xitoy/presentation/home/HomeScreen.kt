@@ -382,14 +382,7 @@ fun HomeScreen(
 
             when {
                 isLoading && filteredProducts.isEmpty() -> {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        Box(
-                            modifier = Modifier.fillMaxWidth().height(200.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator(color = DalliPrimary, strokeWidth = 3.dp)
-                        }
-                    }
+                    items(6) { SkeletonProductCard() }
                 }
                 errorMessage != null && filteredProducts.isEmpty() -> {
                     item(span = { GridItemSpan(maxLineSpan) }) {
