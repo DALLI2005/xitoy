@@ -886,14 +886,33 @@ fun ProductCard(
 
     val isTemporary = product.discountType == "vaqtinchalik" && !product.discountExpires.isNullOrBlank()
     val haptic = rememberStrongHaptic()
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.97f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+        label = "card_press"
+    )
 
     Card(
         onClick = onClick,
+        interactionSource = interactionSource,
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.cardColors(containerColor = DalliSurface),
-        border = BorderStroke(1.dp, if (rank != null) rankBorderColor else DalliLine),
-        modifier = Modifier.fillMaxWidth()
+        border = if (rank != null) BorderStroke(1.dp, rankBorderColor) else null,
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+            }
+            .shadow(
+                elevation = 6.dp,
+                shape = RoundedCornerShape(22.dp),
+                ambientColor = DalliPrimary.copy(alpha = 0.08f),
+                spotColor = Color.Black.copy(alpha = 0.10f)
+            )
     ) {
         Column(modifier = Modifier.padding(9.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             // Rasm + ustki badge'lar
