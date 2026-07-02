@@ -620,12 +620,26 @@ private fun ShopHeader(
                     .clickable { onFavoritesClick() },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Lucide.Heart,
-                    contentDescription = "Sevimlilar",
-                    tint = DalliText,
-                    modifier = Modifier.size(20.dp)
-                )
+                BadgedBox(badge = {
+                    if (favoritesCount > 0) {
+                        Badge(containerColor = DalliError, contentColor = Color.White) {
+                            Text(
+                                text = if (favoritesCount > 99) "99+" else "$favoritesCount",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
+                    }
+                }) {
+                    Icon(
+                        imageVector = Lucide.Heart,
+                        contentDescription = "Sevimlilar",
+                        tint = DalliText,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .scale(heartScale.value)
+                    )
+                }
             }
             Spacer(Modifier.width(8.dp))
             CnyRatePill()
