@@ -91,6 +91,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.commander.xitoy.R
 import com.commander.xitoy.data.remote.OrderItem
 import com.commander.xitoy.domain.model.CartManager
 import com.commander.xitoy.domain.model.CurrencyRateManager
