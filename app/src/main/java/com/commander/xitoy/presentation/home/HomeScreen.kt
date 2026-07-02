@@ -236,7 +236,12 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .padding(top = 16.dp, bottom = 4.dp)
                         .clip(RoundedCornerShape(24.dp))
-                        .background(DalliSurface)
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(DalliSurface, DalliPrimarySoft)
+                            )
+                        )
+                        .border(1.dp, DalliLine, RoundedCornerShape(24.dp))
                         .padding(horizontal = 16.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
