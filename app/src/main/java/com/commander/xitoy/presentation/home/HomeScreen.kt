@@ -1184,15 +1184,24 @@ fun ProductCard(
                             .background(
                                 Brush.linearGradient(listOf(DalliPrimary, Color(0xFF7C3AED)))
                             )
-                            .clickable { haptic(); onQuickAdd() },
+                            .clickable { haptic(); showAddedCheck = true; onQuickAdd() },
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            Icons.Default.Add,
-                            contentDescription = "Savatga qo'shish",
-                            tint = Color.White,
-                            modifier = Modifier.size(19.dp)
-                        )
+                        AnimatedContent(
+                            targetState = showAddedCheck,
+                            transitionSpec = {
+                                (scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy)) + fadeIn()) togetherWith
+                                    (scaleOut() + fadeOut(tween(120)))
+                            },
+                            label = "add_morph"
+                        ) { added ->
+                            Icon(
+                                imageVector = if (added) Lucide.Check else Icons.Default.Add,
+                                contentDescription = "Savatga qo'shish",
+                                tint = Color.White,
+                                modifier = Modifier.size(19.dp)
+                            )
+                        }
                     }
                 }
                 if (isTemporary) {
