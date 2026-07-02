@@ -515,8 +515,17 @@ private fun ShopHeader(
             Row(
                 modifier = Modifier
                     .weight(1f)
-                    .clickable { onTitleClick() }
+                    .clickable { onTitleClick() },
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                Image(
+                    painter = painterResource(id = R.drawable.logo_dalli_new),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(30.dp)
+                        .clip(RoundedCornerShape(9.dp))
+                )
+                Spacer(Modifier.width(8.dp))
                 Text(
                     text = "Dalli",
                     fontWeight = FontWeight.ExtraBold,
