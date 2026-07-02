@@ -652,7 +652,7 @@ private fun HeroBanner(onClick: () -> Unit, totalCount: Int = 0) {
             .clip(RoundedCornerShape(20.dp))
             .background(
                 Brush.linearGradient(
-                    colors = listOf(Color(0xFF2B3FD0), DalliPrimary, Color(0xFF5B8DEF))
+                    colors = listOf(Color(0xFF2D1B69), Color(0xFF4B1FDC), Color(0xFF7C3AED))
                 )
             )
             .clickable { onClick() }
