@@ -827,16 +827,31 @@ private fun CategoryChipRow(selected: String, onCategoryClick: (String) -> Unit)
         categories.forEach { cat ->
             val isAll = cat == "Hammasi"
             val isSelected = if (isAll) selected.isBlank() else selected.equals(cat, ignoreCase = true)
-            Card(
-                onClick = { onCategoryClick(if (isAll) "" else cat) },
-                shape = RoundedCornerShape(999.dp),
-                colors = CardDefaults.cardColors(containerColor = if (isSelected) DalliText else DalliSurface),
-                border = if (!isSelected) BorderStroke(1.dp, DalliLine) else null,
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            Box(
+                modifier = Modifier
+                    .then(
+                        if (isSelected) Modifier.shadow(
+                            elevation = 6.dp,
+                            shape = RoundedCornerShape(999.dp),
+                            ambientColor = DalliPrimary.copy(alpha = 0.3f),
+                            spotColor = DalliPrimary.copy(alpha = 0.35f)
+                        ) else Modifier
+                    )
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(
+                        if (isSelected)
+                            Brush.linearGradient(listOf(DalliPrimary, Color(0xFF7C3AED)))
+                        else
+                            Brush.linearGradient(listOf(DalliSurface, DalliSurface))
+                    )
+                    .then(
+                        if (!isSelected) Modifier.border(1.dp, DalliLine, RoundedCornerShape(999.dp)) else Modifier
+                    )
+                    .clickable { onCategoryClick(if (isAll) "" else cat) }
             ) {
                 Text(
                     text = cat,
-                    modifier = Modifier.padding(horizontal = 15.dp, vertical = 9.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
                     color = if (isSelected) Color.White else DalliTextSecondary
