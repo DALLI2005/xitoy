@@ -1039,9 +1039,17 @@ fun ProductCard(
                     Spacer(Modifier.width(8.dp))
                     Box(
                         modifier = Modifier
-                            .size(34.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(DalliPrimary)
+                            .size(36.dp)
+                            .shadow(
+                                elevation = 6.dp,
+                                shape = RoundedCornerShape(12.dp),
+                                ambientColor = DalliPrimary.copy(alpha = 0.35f),
+                                spotColor = DalliPrimary.copy(alpha = 0.4f)
+                            )
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                Brush.linearGradient(listOf(DalliPrimary, Color(0xFF7C3AED)))
+                            )
                             .clickable { haptic(); onQuickAdd() },
                         contentAlignment = Alignment.Center
                     ) {
@@ -1049,7 +1057,7 @@ fun ProductCard(
                             Icons.Default.Add,
                             contentDescription = "Savatga qo'shish",
                             tint = Color.White,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(19.dp)
                         )
                     }
                 }
