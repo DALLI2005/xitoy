@@ -985,6 +985,45 @@ fun ProductCard(
         label = "card_press"
     )
 
+    // Bir martalik kirish animatsiyasi: pastdan yumshoq ko'tarilib paydo bo'ladi
+    val entranceAlpha = remember { Animatable(if (entranceIndex != null) 0f else 1f) }
+    val entranceShift = remember { Animatable(if (entranceIndex != null) 26f else 0f) }
+    LaunchedEffect(Unit) {
+        if (entranceIndex != null) {
+            delay((entranceIndex % 6) * 45L)
+            launch { entranceAlpha.animateTo(1f, tween(320)) }
+            launch {
+                entranceShift.animateTo(
+                    0f,
+                    spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow)
+                )
+            }
+        }
+    }
+
+    // Yurakcha bosilganda "pop" effekti (faqat qo'shilganda)
+    val favScale = remember { Animatable(1f) }
+    var favInitialized by remember { mutableStateOf(false) }
+    LaunchedEffect(isFavorite) {
+        if (favInitialized && isFavorite) {
+            favScale.snapTo(0.5f)
+            favScale.animateTo(
+                1f,
+                spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+            )
+        }
+        favInitialized = true
+    }
+
+    // "+" bosilganda bir lahzaga ✓ belgiga aylanadi
+    var showAddedCheck by remember { mutableStateOf(false) }
+    LaunchedEffect(showAddedCheck) {
+        if (showAddedCheck) {
+            delay(900L)
+            showAddedCheck = false
+        }
+    }
+
     Card(
         onClick = onClick,
         interactionSource = interactionSource,
