@@ -1066,6 +1066,57 @@ fun ProductCard(
 }
 
 @Composable
+private fun SkeletonProductCard() {
+    val transition = rememberInfiniteTransition(label = "skeleton")
+    val shimmerAlpha by transition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 0.8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(700, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "skeleton_alpha"
+    )
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .background(DalliSurface)
+            .padding(9.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .clip(RoundedCornerShape(16.dp))
+                .background(DalliLine.copy(alpha = shimmerAlpha))
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .height(13.dp)
+                .clip(RoundedCornerShape(7.dp))
+                .background(DalliLine.copy(alpha = shimmerAlpha))
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.55f)
+                .height(13.dp)
+                .clip(RoundedCornerShape(7.dp))
+                .background(DalliLine.copy(alpha = shimmerAlpha))
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.45f)
+                .height(17.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(DalliLine.copy(alpha = shimmerAlpha))
+        )
+    }
+}
+
+@Composable
 private fun BadgePill(text: String, bg: Color, textColor: Color, icon: ImageVector? = null) {
     Row(
         modifier = Modifier
