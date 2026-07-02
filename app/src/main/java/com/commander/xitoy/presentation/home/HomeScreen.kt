@@ -310,13 +310,19 @@ fun HomeScreen(
                         }
                         Box(
                             modifier = Modifier
-                                .size(50.dp)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(if (filterState.isActive) DalliPrimary else DalliSurface)
-                                .border(
-                                    width = 1.dp,
-                                    color = if (filterState.isActive) DalliPrimary else DalliLine,
-                                    shape = RoundedCornerShape(14.dp)
+                                .size(52.dp)
+                                .shadow(
+                                    elevation = 8.dp,
+                                    shape = CircleShape,
+                                    ambientColor = DalliPrimary.copy(alpha = 0.10f),
+                                    spotColor = DalliPrimary.copy(alpha = 0.12f)
+                                )
+                                .clip(CircleShape)
+                                .background(
+                                    if (filterState.isActive)
+                                        Brush.linearGradient(listOf(DalliPrimary, Color(0xFF7C3AED)))
+                                    else
+                                        Brush.linearGradient(listOf(DalliSurface, DalliSurface))
                                 )
                                 .clickable { showFilterSheet = true },
                             contentAlignment = Alignment.Center
