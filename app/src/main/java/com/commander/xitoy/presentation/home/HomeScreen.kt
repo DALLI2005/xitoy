@@ -129,7 +129,9 @@ import com.composables.icons.lucide.CircleCheck
 import com.composables.icons.lucide.Flame
 import com.composables.icons.lucide.Heart
 import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.MapPin
 import com.composables.icons.lucide.Medal
+import com.composables.icons.lucide.Sparkles
 
 import com.composables.icons.lucide.Zap
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
