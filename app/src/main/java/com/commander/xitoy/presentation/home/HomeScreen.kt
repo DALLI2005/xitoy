@@ -1036,6 +1036,8 @@ fun ProductCard(
             .graphicsLayer {
                 scaleX = pressScale
                 scaleY = pressScale
+                alpha = entranceAlpha.value
+                translationY = entranceShift.value.dp.toPx()
             }
             .shadow(
                 elevation = 6.dp,
