@@ -241,24 +241,46 @@ fun HomeScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 16.dp, bottom = 4.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(DalliSurface, DalliPrimarySoft)
-                            )
-                        )
-                        .border(1.dp, DalliLine, RoundedCornerShape(24.dp))
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                        .padding(top = 20.dp, bottom = 2.dp, start = 2.dp, end = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (firstName.isNotBlank()) "Salom, $firstName" else "Xush kelibsiz",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = (-0.5).sp,
+                            color = DalliText,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                Lucide.MapPin,
+                                contentDescription = null,
+                                tint = DalliPrimary,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Text(
+                                text = "Rishton, Farg'ona",
+                                fontSize = 13.sp,
+                                color = DalliMuted,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
                     Box(
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(46.dp)
+                            .shadow(8.dp, CircleShape, ambientColor = DalliPrimary.copy(alpha = 0.25f), spotColor = DalliPrimary.copy(alpha = 0.3f))
                             .clip(CircleShape)
                             .background(
                                 Brush.linearGradient(
-                                    colors = listOf(DalliPrimary, DalliPrimaryDark)
+                                    colors = listOf(DalliPrimary, Color(0xFF7C3AED))
                                 )
                             ),
                         contentAlignment = Alignment.Center
@@ -266,26 +288,8 @@ fun HomeScreen(
                         Text(
                             text = avatarLetter,
                             color = Color.White,
-                            fontSize = 20.sp,
+                            fontSize = 19.sp,
                             fontWeight = FontWeight.ExtraBold
-                        )
-                    }
-                    Spacer(Modifier.width(14.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = if (firstName.isNotBlank()) "Salom, $firstName" else "Xush kelibsiz",
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = DalliText,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text = "Rishton, Farg'ona",
-                            fontSize = 13.sp,
-                            color = DalliMuted,
-                            fontWeight = FontWeight.Medium
                         )
                     }
                 }
