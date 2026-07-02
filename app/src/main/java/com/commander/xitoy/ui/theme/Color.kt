@@ -21,8 +21,8 @@ val DalliText         = Color(0xFF0F1729) // --ink: primary text (dark navy)
 val DalliTextSecondary= Color(0xFF374151) // --ink-2: secondary text
 val DalliMuted        = Color(0xFF6B7280) // --ink-3: muted / placeholder
 
-val DalliLine         = Color(0xFFE2E8F0) // --line: dividers & card borders
-val DalliLine2        = Color(0xFFCBD5E1) // --line-2: stronger borders
+val DalliLine         = Color(0xFFE8E5F3) // --line: dividers & card borders (binafsha tusli)
+val DalliLine2        = Color(0xFFD2CCE8) // --line-2: stronger borders
 
 val DalliSuccess      = Color(0xFF16A34A) // --success: green
 val DalliSuccessSoft  = Color(0xFFDCFCE7) // --success-soft: tinted green bg
