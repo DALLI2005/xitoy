@@ -220,9 +220,17 @@ fun HomeScreen(
         }
     }
 
+    val headerScrolled by remember {
+        derivedStateOf {
+            gridState.firstVisibleItemIndex > 0 || gridState.firstVisibleItemScrollOffset > 0
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
     Column(modifier = Modifier.fillMaxSize()) {
         ShopHeader(
+            scrolled = headerScrolled,
+            favoritesCount = favorites.size,
             onTitleClick = { coroutineScope.launch { gridState.animateScrollToItem(0) } },
             onFavoritesClick = onFavoritesClick
         )
