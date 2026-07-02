@@ -2,11 +2,12 @@ package com.commander.xitoy.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Dalli Shop — Indigo + Dark Ink design system
-val DalliPrimary      = Color(0xFF1B40D4) // --primary: rich indigo
-val DalliPrimaryDark  = Color(0xFF1535B0) // pressed / darker indigo
-val DalliPrimarySoft  = Color(0xFFEEF2FF) // --primary-soft: tinted surface
-val DalliPrimaryInk   = Color(0xFF1B40D4) // text on primary-soft
+// Dalli Shop — Royal Purple + Dark Ink design system (yangi logo brendiga mos)
+val DalliPrimary      = Color(0xFF4B1FDC) // --primary: royal purple
+val DalliPrimaryDark  = Color(0xFF3714A6) // pressed / darker purple
+val DalliPrimarySoft  = Color(0xFFF0EBFF) // --primary-soft: tinted surface
+val DalliPrimaryInk   = Color(0xFF4B1FDC) // text on primary-soft
+val DalliTeal         = Color(0xFF00E5D1) // logo strelkasi rangi — accent glow
 
 val DalliAccent       = Color(0xFFFF6B00) // --accent: orange CTA
 val DalliAccentSoft   = Color(0xFFFFF0E6) // --accent-soft
