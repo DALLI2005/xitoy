@@ -616,15 +616,23 @@ private fun FlatSearchBar(value: String, onValueChange: (String) -> Unit) {
         value = value,
         onValueChange = onValueChange,
         placeholder = { Text("Mahsulot yoki brend qidirish…", color = DalliMuted, fontSize = 14.sp) },
-        leadingIcon = { Icon(Icons.Default.Search, null, tint = DalliMuted, modifier = Modifier.size(19.dp)) },
-        modifier = Modifier.fillMaxWidth().height(50.dp),
-        shape = RoundedCornerShape(13.dp),
+        leadingIcon = { Icon(Icons.Default.Search, null, tint = DalliPrimary, modifier = Modifier.size(19.dp)) },
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(52.dp)
+            .shadow(
+                elevation = 8.dp,
+                shape = RoundedCornerShape(999.dp),
+                ambientColor = DalliPrimary.copy(alpha = 0.10f),
+                spotColor = DalliPrimary.copy(alpha = 0.12f)
+            ),
+        shape = RoundedCornerShape(999.dp),
         singleLine = true,
         colors = TextFieldDefaults.colors(
             focusedContainerColor = DalliSurface,
             unfocusedContainerColor = DalliSurface,
             focusedIndicatorColor = DalliPrimary,
-            unfocusedIndicatorColor = DalliLine,
+            unfocusedIndicatorColor = Color.Transparent,
             cursorColor = DalliPrimary
         )
     )
