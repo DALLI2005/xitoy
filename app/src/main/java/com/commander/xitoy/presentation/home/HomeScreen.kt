@@ -663,7 +663,17 @@ private fun CnyRatePill() {
     ) {
         Icon(Icons.Default.Public, null, tint = DalliPrimary, modifier = Modifier.size(14.dp))
         Text("¥1 =", color = DalliPrimary, fontWeight = FontWeight.Bold, fontSize = 12.5.sp)
-        Text(rate?.somText ?: "…", color = DalliPrimary, fontWeight = FontWeight.ExtraBold, fontSize = 12.5.sp)
+        // Kurs yangilanganda raqam g'ildirakdek pastdan yuqoriga aylanib almashadi
+        AnimatedContent(
+            targetState = rate?.somText ?: "…",
+            transitionSpec = {
+                (slideInVertically { it } + fadeIn(tween(220))) togetherWith
+                    (slideOutVertically { -it } + fadeOut(tween(180)))
+            },
+            label = "rate_roll"
+        ) { somText ->
+            Text(somText, color = DalliPrimary, fontWeight = FontWeight.ExtraBold, fontSize = 12.5.sp)
+        }
         if (rate != null) {
             Text(
                 "${if (rate.isUp) "▲" else "▼"}${rate.percentText}%",
