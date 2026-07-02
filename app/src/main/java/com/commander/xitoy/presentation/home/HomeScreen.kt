@@ -131,6 +131,7 @@ import com.commander.xitoy.ui.theme.DalliSurface
 import com.commander.xitoy.ui.theme.DalliTeal
 import com.commander.xitoy.ui.theme.DalliText
 import com.commander.xitoy.ui.theme.DalliTextSecondary
+import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.CircleCheck
 import com.composables.icons.lucide.Flame
 import com.composables.icons.lucide.Heart
