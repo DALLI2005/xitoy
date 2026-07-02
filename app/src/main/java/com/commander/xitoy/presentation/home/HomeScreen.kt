@@ -185,6 +185,8 @@ fun HomeScreen(
     val context = LocalContext.current
     val gridState = rememberLazyGridState()
     val coroutineScope = rememberCoroutineScope()
+    // Kirish animatsiyasi har bir karta uchun faqat bir marta o'ynaydi
+    val shownProductIds = remember { mutableSetOf<Int>() }
 
     LaunchedEffect(addedProductName) {
         if (addedProductName != null) {
