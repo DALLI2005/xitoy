@@ -666,13 +666,13 @@ private fun HeroBanner(onClick: () -> Unit, totalCount: Int = 0) {
                 .clip(CircleShape)
                 .background(Color.White.copy(alpha = 0.18f))
         )
-        // Doira 2: sekin vertikal suzish
+        // Doira 2: sekin vertikal suzish — logo strelkasidagi firuza tus
         Box(
             modifier = Modifier
                 .size(90.dp)
                 .offset(x = 280.dp, y = (90f - circle2Offset).dp)
                 .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.14f))
+                .background(DalliTeal.copy(alpha = 0.20f))
         )
         // Shimmer qatlami: diagonal yorug'lik chizig'i
         Box(
