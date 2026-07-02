@@ -1287,10 +1287,18 @@ private fun ProductRow(product: Product, onClick: () -> Unit, onQuickAdd: () -> 
                     PriceText(product.price.toLong(), numberSize = 17.sp, somSize = 11.sp)
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(DalliPrimary)
+                            .shadow(
+                                elevation = 6.dp,
+                                shape = RoundedCornerShape(12.dp),
+                                ambientColor = DalliPrimary.copy(alpha = 0.35f),
+                                spotColor = DalliPrimary.copy(alpha = 0.4f)
+                            )
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                Brush.linearGradient(listOf(DalliPrimary, Color(0xFF7C3AED)))
+                            )
                             .clickable { haptic(); onQuickAdd() }
-                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                            .padding(horizontal = 14.dp, vertical = 9.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
