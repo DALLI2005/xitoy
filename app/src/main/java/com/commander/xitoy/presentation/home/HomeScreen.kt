@@ -1454,12 +1454,26 @@ private fun ProductRow(product: Product, onClick: () -> Unit, onQuickAdd: () -> 
                             .background(
                                 Brush.linearGradient(listOf(DalliPrimary, Color(0xFF7C3AED)))
                             )
-                            .clickable { haptic(); onQuickAdd() }
+                            .clickable { haptic(); showAddedCheck = true; onQuickAdd() }
                             .padding(horizontal = 14.dp, vertical = 9.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                            Icon(Icons.Default.ShoppingCart, null, tint = Color.White, modifier = Modifier.size(15.dp))
+                            AnimatedContent(
+                                targetState = showAddedCheck,
+                                transitionSpec = {
+                                    (scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy)) + fadeIn()) togetherWith
+                                        (scaleOut() + fadeOut(tween(120)))
+                                },
+                                label = "row_add_morph"
+                            ) { added ->
+                                Icon(
+                                    imageVector = if (added) Lucide.Check else Icons.Default.ShoppingCart,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                            }
                             Text("Savatga", color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
                         }
                     }
