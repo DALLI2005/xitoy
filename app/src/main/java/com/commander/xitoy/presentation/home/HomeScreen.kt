@@ -682,7 +682,13 @@ private fun HeroBanner(onClick: () -> Unit, totalCount: Int = 0) {
         modifier = Modifier
             .fillMaxWidth()
             .height(180.dp)
-            .clip(RoundedCornerShape(20.dp))
+            .shadow(
+                elevation = 14.dp,
+                shape = RoundedCornerShape(24.dp),
+                ambientColor = DalliPrimary.copy(alpha = 0.35f),
+                spotColor = DalliPrimary.copy(alpha = 0.4f)
+            )
+            .clip(RoundedCornerShape(24.dp))
             .background(
                 Brush.linearGradient(
                     colors = listOf(Color(0xFF2D1B69), Color(0xFF4B1FDC), Color(0xFF7C3AED))
