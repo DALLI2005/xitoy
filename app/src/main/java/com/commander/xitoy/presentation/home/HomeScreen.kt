@@ -478,13 +478,14 @@ fun HomeScreen(
     ) {
         Row(
             modifier = Modifier
-                .clip(RoundedCornerShape(14.dp))
+                .shadow(12.dp, RoundedCornerShape(999.dp), spotColor = Color.Black.copy(alpha = 0.3f))
+                .clip(RoundedCornerShape(999.dp))
                 .background(DalliText)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 18.dp, vertical = 13.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Lucide.CircleCheck, null, tint = DeliveryGreen, modifier = Modifier.size(16.dp))
+            Icon(Lucide.CircleCheck, null, tint = DalliTeal, modifier = Modifier.size(16.dp))
             Text(
                 "Savatga qo'shildi",
                 color = Color.White,
