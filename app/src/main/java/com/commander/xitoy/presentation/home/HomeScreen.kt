@@ -1212,13 +1212,31 @@ private fun PriceText(value: Long, numberSize: TextUnit, somSize: TextUnit) {
 @Composable
 private fun ProductRow(product: Product, onClick: () -> Unit, onQuickAdd: () -> Unit = {}) {
     val haptic = rememberStrongHaptic()
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.98f else 1f,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+        label = "row_press"
+    )
     Card(
         onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
+        interactionSource = interactionSource,
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = DalliSurface),
-        border = BorderStroke(1.dp, DalliLine),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+            }
+            .shadow(
+                elevation = 6.dp,
+                shape = RoundedCornerShape(18.dp),
+                ambientColor = DalliPrimary.copy(alpha = 0.08f),
+                spotColor = Color.Black.copy(alpha = 0.10f)
+            )
     ) {
         Row(
             modifier = Modifier.padding(10.dp),
