@@ -368,7 +368,17 @@ fun HomeScreen(
                             }
                         }
                     }
-                    HeroBanner(onClick = onSalesClick, totalCount = totalCount)
+                    HeroBanner(
+                        onClick = onSalesClick,
+                        totalCount = totalCount,
+                        // Parallax: scroll paytida banner kontentdan sal sekinroq siljiydi
+                        modifier = Modifier.graphicsLayer {
+                            val heroItem = gridState.layoutInfo.visibleItemsInfo
+                                .firstOrNull { it.index == 1 }
+                            val y = heroItem?.offset?.y ?: 0
+                            translationY = if (y < 0) -y * 0.15f else 0f
+                        }
+                    )
                     if (shouldShowBanner) {
                         DeliveryBanner(
                             order = latestOrder!!,
