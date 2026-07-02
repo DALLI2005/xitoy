@@ -873,6 +873,29 @@ private fun HeroBanner(onClick: () -> Unit, totalCount: Int = 0, modifier: Modif
 
 @Composable
 private fun DeliveryBanner(order: OrderItem, stage: Int, onClick: () -> Unit) {
+    val maxStage = (ORDER_STAGES.size - 1).coerceAtLeast(1)
+    val isDone = stage >= maxStage
+
+    // Yuk mashinasi banner ochilganda boshidan joriy bosqichgacha "haydab" boradi
+    val truckFrac = remember { Animatable(0f) }
+    LaunchedEffect(stage) {
+        truckFrac.animateTo(
+            stage / maxStage.toFloat(),
+            tween(1100, easing = FastOutSlowInEasing)
+        )
+    }
+    // Yetkazilganda chapdagi belgi ✓ bo'lib pop qiladi
+    val doneScale = remember { Animatable(1f) }
+    LaunchedEffect(isDone) {
+        if (isDone) {
+            doneScale.snapTo(0.4f)
+            doneScale.animateTo(
+                1f,
+                spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+            )
+        }
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -883,7 +906,14 @@ private fun DeliveryBanner(order: OrderItem, stage: Int, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Icon(Icons.Default.LocalShipping, null, tint = DeliveryGreen, modifier = Modifier.size(22.dp))
+        Icon(
+            imageVector = if (isDone) Lucide.CircleCheck else Icons.Default.LocalShipping,
+            contentDescription = null,
+            tint = DeliveryGreen,
+            modifier = Modifier
+                .size(22.dp)
+                .scale(doneScale.value)
+        )
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
                 "${order.order_id} · ${holatDisplay(order.holat)}",
@@ -893,7 +923,23 @@ private fun DeliveryBanner(order: OrderItem, stage: Int, onClick: () -> Unit) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            OrderProgressBar(stage = stage, modifier = Modifier.fillMaxWidth())
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val trackWidth = maxWidth - 14.dp
+                Column {
+                    if (!isDone) {
+                        Icon(
+                            Icons.Default.LocalShipping,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.9f),
+                            modifier = Modifier
+                                .offset(x = trackWidth * truckFrac.value)
+                                .size(13.dp)
+                        )
+                        Spacer(Modifier.height(3.dp))
+                    }
+                    OrderProgressBar(stage = stage, modifier = Modifier.fillMaxWidth())
+                }
+            }
         }
         Icon(
             Icons.AutoMirrored.Filled.KeyboardArrowRight,
