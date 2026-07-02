@@ -747,7 +747,7 @@ private fun HeroBanner(onClick: () -> Unit, totalCount: Int = 0, modifier: Modif
     )
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(180.dp)
             .shadow(
