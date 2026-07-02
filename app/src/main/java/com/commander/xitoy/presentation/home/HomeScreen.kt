@@ -1369,6 +1369,13 @@ private fun ProductRow(product: Product, onClick: () -> Unit, onQuickAdd: () -> 
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
         label = "row_press"
     )
+    var showAddedCheck by remember { mutableStateOf(false) }
+    LaunchedEffect(showAddedCheck) {
+        if (showAddedCheck) {
+            delay(900L)
+            showAddedCheck = false
+        }
+    }
     Card(
         onClick = onClick,
         interactionSource = interactionSource,
