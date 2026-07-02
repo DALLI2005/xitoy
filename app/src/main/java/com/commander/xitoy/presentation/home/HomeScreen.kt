@@ -432,13 +432,19 @@ fun HomeScreen(
             if (feed.isNotEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Column {
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            "Siz uchun lenta",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = DalliText
-                        )
+                        Spacer(Modifier.height(10.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Lucide.Sparkles, null, tint = DalliPrimary, modifier = Modifier.size(18.dp))
+                            Text(
+                                "Siz uchun lenta",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = DalliText
+                            )
+                        }
                     }
                 }
                 items(feed, span = { GridItemSpan(maxLineSpan) }, key = { "feed_${it.id}" }) { product ->
