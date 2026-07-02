@@ -138,7 +138,7 @@ private fun CustomNavTab(
     ) {
         val contentColor = if (selected) Color.White else DalliText
 
-        Box(contentAlignment = Alignment.Center) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.scale(iconPop.value)) {
             if (item.route == "cart" && cartCount > 0) {
                 BadgedBox(
                     badge = {
