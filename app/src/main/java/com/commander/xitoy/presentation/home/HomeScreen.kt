@@ -542,12 +542,40 @@ fun HomeScreen(
 
 @Composable
 private fun ShopHeader(
+    scrolled: Boolean = false,
+    favoritesCount: Int = 0,
     onTitleClick: () -> Unit = {},
     onFavoritesClick: () -> Unit = {}
 ) {
+    // Scroll boshlanganda header ostida yumshoq soya paydo bo'ladi
+    val headerElevation by animateDpAsState(
+        targetValue = if (scrolled) 10.dp else 0.dp,
+        animationSpec = tween(220),
+        label = "header_elevation"
+    )
+    // Sevimlilarga yangi mahsulot qo'shilganda yurakcha "sakrab" qo'yadi
+    val heartScale = remember { Animatable(1f) }
+    var prevFavCount by remember { mutableStateOf(-1) }
+    LaunchedEffect(favoritesCount) {
+        if (prevFavCount in 0 until favoritesCount) {
+            heartScale.snapTo(1f)
+            heartScale.animateTo(1.4f, spring(stiffness = Spring.StiffnessHigh))
+            heartScale.animateTo(
+                1f,
+                spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+            )
+        }
+        prevFavCount = favoritesCount
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .shadow(
+                elevation = headerElevation,
+                ambientColor = DalliPrimary.copy(alpha = 0.12f),
+                spotColor = DalliPrimary.copy(alpha = 0.15f)
+            )
             .background(DalliSurface)
     ) {
         Row(
