@@ -438,11 +438,13 @@ fun HomeScreen(
                     }
                 }
                 else -> {
-                    items(filteredProducts, key = { it.id }) { product ->
+                    itemsIndexed(filteredProducts, key = { _, p -> p.id }) { index, product ->
                         val isFav = favorites.any { it.id == product.id }
+                        val playEntrance = remember(product.id) { shownProductIds.add(product.id) }
                         ProductCard(
                             product = product,
                             isFavorite = isFav,
+                            entranceIndex = if (playEntrance) index else null,
                             onClick = { onProductClick(product) },
                             onQuickAdd = {
                                     if (product.allImages.size > 1 || product.variantlarYoqilgan) {
