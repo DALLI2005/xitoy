@@ -963,6 +963,7 @@ fun ProductCard(
     product: Product,
     rank: Int? = null,
     isFavorite: Boolean = false,
+    entranceIndex: Int? = null,
     onClick: () -> Unit,
     onQuickAdd: () -> Unit = {}
 ) {
