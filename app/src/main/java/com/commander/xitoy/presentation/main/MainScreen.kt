@@ -245,6 +245,7 @@ fun MainScreen(
                         .padding(horizontal = 8.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+                    val tabHaptic = rememberHaptic()
                     navItems.forEach { item ->
                         val selected = currentRoute == item.route
                         CustomNavTab(
@@ -253,6 +254,7 @@ fun MainScreen(
                             cartCount = if (item.route == "cart") cartCount else 0,
                             modifier = Modifier.weight(1f),
                             onClick = {
+                                tabHaptic()
                                 bottomNavController.navigate(item.route) {
                                     popUpTo(bottomNavController.graph.findStartDestination().id) {
                                         saveState = true
