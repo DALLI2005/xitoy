@@ -112,6 +112,7 @@ import com.commander.xitoy.domain.model.FavoritesManager
 import com.commander.xitoy.domain.model.Product
 import com.commander.xitoy.domain.model.SeenOrdersManager
 import com.commander.xitoy.domain.model.SessionManager
+import com.commander.xitoy.presentation.common.ORDER_STAGES
 import com.commander.xitoy.presentation.common.OrderProgressBar
 import com.commander.xitoy.presentation.common.holatDisplay
 import com.commander.xitoy.presentation.common.holatToStage
