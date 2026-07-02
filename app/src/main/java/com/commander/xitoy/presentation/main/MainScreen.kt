@@ -56,6 +56,7 @@ import com.commander.xitoy.domain.model.CartManager
 import com.commander.xitoy.domain.model.SelectedProductHolder
 import com.commander.xitoy.presentation.MainActivity
 import com.commander.xitoy.presentation.cart.CartScreen
+import com.commander.xitoy.presentation.common.rememberHaptic
 import com.commander.xitoy.presentation.common.tabEnter
 import com.commander.xitoy.presentation.common.tabExit
 import com.commander.xitoy.presentation.favorites.FavoritesScreen
