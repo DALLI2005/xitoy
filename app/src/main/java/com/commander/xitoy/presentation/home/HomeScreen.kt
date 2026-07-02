@@ -717,7 +717,7 @@ private fun HeroBanner(onClick: () -> Unit, totalCount: Int = 0) {
         Box(
             modifier = Modifier
                 .matchParentSize()
-                .clip(RoundedCornerShape(20.dp))
+                .clip(RoundedCornerShape(24.dp))
                 .background(
                     Brush.linearGradient(
                         colors = listOf(
