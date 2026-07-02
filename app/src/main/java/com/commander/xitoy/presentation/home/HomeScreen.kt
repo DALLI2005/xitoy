@@ -715,7 +715,7 @@ private fun FlatSearchBar(value: String, onValueChange: (String) -> Unit) {
 }
 
 @Composable
-private fun HeroBanner(onClick: () -> Unit, totalCount: Int = 0) {
+private fun HeroBanner(onClick: () -> Unit, totalCount: Int = 0, modifier: Modifier = Modifier) {
     val infiniteTransition = rememberInfiniteTransition(label = "hero_motion")
 
     val circle1Scale by infiniteTransition.animateFloat(
