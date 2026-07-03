@@ -80,6 +80,13 @@ object SessionManager {
         appContext?.let { OnboardingManager.markCompletedOnce(it) }
     }
 
+    // Faqat tokenni yangilaydi (masalan, parol o'zgartirilganda) — boshqa maydonlar o'zgarmaydi
+    fun updateToken(newToken: String) {
+        val current = _session.value ?: return
+        prefs?.edit()?.putString(KEY_TOKEN, newToken)?.apply()
+        _session.value = current.copy(token = newToken)
+    }
+
     fun logout() {
         prefs?.edit()?.clear()?.apply()
         _session.value = null
