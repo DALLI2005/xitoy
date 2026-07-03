@@ -28,6 +28,7 @@ object SessionManager {
     private const val KEY_FULLNAME = "fullname"
     private const val KEY_PHONE = "phone"
     private const val KEY_ADDRESS = "address"
+    private const val KEY_TOKEN = "token"
 
     private var prefs: SharedPreferences? = null
     private var appContext: Context? = null
