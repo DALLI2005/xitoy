@@ -71,6 +71,9 @@ interface AuthApi {
     @POST("auth/login-password")
     suspend fun loginPassword(@Body body: LoginRequest): AuthResponse
 
+    @POST("auth/change-password")
+    suspend fun changePassword(@Body body: ChangePasswordRequest): ChangePasswordResponse
+
     @POST("auth/register-fcm-token")
     suspend fun registerFcmToken(@Body request: FcmTokenRequest): Map<String, String>
 }
