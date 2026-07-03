@@ -552,6 +552,44 @@ async def login_password(data: LoginIn):
     }
 
 
+class ChangePasswordIn(BaseModel):
+    user_id: int
+    old_password: str
+    new_password: str
+
+
+@app.post("/auth/change-password")
+async def change_password(data: ChangePasswordIn):
+    if len(data.new_password) < 6:
+        raise HTTPException(400, "Yangi parol kamida 6 belgidan iborat bo'lishi kerak")
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT password_hash, salt FROM app_users WHERE user_id = ?",
+            (data.user_id,),
+        ) as cur:
+            row = await cur.fetchone()
+
+        if not row:
+            raise HTTPException(404, "Foydalanuvchi topilmadi")
+
+        stored_hash, salt = row
+        old_hash = await asyncio.to_thread(_hash_password, data.old_password, salt)
+        if not hmac.compare_digest(old_hash, stored_hash):
+            raise HTTPException(401, "Joriy parol noto'g'ri")
+
+        new_salt = secrets.token_hex(16)
+        new_hash = await asyncio.to_thread(_hash_password, data.new_password, new_salt)
+        new_token = secrets.token_hex(32)
+        await db.execute(
+            "UPDATE app_users SET password_hash = ?, salt = ?, session_token = ? WHERE user_id = ?",
+            (new_hash, new_salt, new_token, data.user_id),
+        )
+        await db.commit()
+
+    return {"ok": True, "token": new_token}
+
+
 # ── Telegram auth ──────────────────────────────────────────────────────────────
 def _verify_init_data(init_data: str) -> dict:
     """Telegram WebApp initData ni tekshiradi, user dict qaytaradi."""
