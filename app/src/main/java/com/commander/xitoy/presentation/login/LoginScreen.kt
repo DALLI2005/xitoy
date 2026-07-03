@@ -3,8 +3,11 @@ package com.commander.xitoy.presentation.login
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,50 +17,66 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.TouchApp
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.commander.xitoy.R
-import com.commander.xitoy.presentation.common.DalliLoadingIndicator
 import com.commander.xitoy.ui.theme.DalliBackground
+import com.commander.xitoy.ui.theme.DalliError
+import com.commander.xitoy.ui.theme.DalliLine
 import com.commander.xitoy.ui.theme.DalliMuted
 import com.commander.xitoy.ui.theme.DalliPrimary
 import com.commander.xitoy.ui.theme.DalliPrimaryDark
 import com.commander.xitoy.ui.theme.DalliPrimarySoft
 import com.commander.xitoy.ui.theme.DalliSurface
 import com.commander.xitoy.ui.theme.DalliText
+import com.composables.icons.lucide.Eye
+import com.composables.icons.lucide.EyeOff
+import com.composables.icons.lucide.Lock
 import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.RefreshCw
+import com.composables.icons.lucide.Phone
 import com.composables.icons.lucide.Send
+import com.composables.icons.lucide.User
+
+// TODO: Admin haqiqiy Telegram username'i bilan almashtiring
+private const val ADMIN_TELEGRAM_USERNAME = "ADMIN_USERNAME"
 
 @Composable
 fun LoginScreen(
@@ -65,26 +84,60 @@ fun LoginScreen(
     viewModel: LoginViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val openUrl by viewModel.openUrl.collectAsState()
     val context = LocalContext.current
+    var showForgotDialog by remember { mutableStateOf(false) }
 
-    LaunchedEffect(openUrl) {
-        val url = openUrl ?: return@LaunchedEffect
-        try {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(intent)
-        } catch (e: Exception) {
-            Toast.makeText(context, "Telegram ilovasini ochib bo'lmadi", Toast.LENGTH_LONG).show()
-        }
-        viewModel.onUrlOpened()
+    LaunchedEffect(uiState.isSuccess) {
+        if (uiState.isSuccess) onLoginSuccess()
     }
 
-    LaunchedEffect(uiState) {
-        if (uiState is LoginUiState.Success) {
-            onLoginSuccess()
-        }
+    if (showForgotDialog) {
+        AlertDialog(
+            onDismissRequest = { showForgotDialog = false },
+            containerColor = DalliSurface,
+            title = {
+                Text(
+                    "Parolni tiklash",
+                    fontWeight = FontWeight.ExtraBold,
+                    color = DalliText
+                )
+            },
+            text = {
+                Text(
+                    "Parolni tiklash uchun admin bilan bog'laning.",
+                    color = DalliMuted,
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showForgotDialog = false
+                    try {
+                        val intent = Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse("https://t.me/$ADMIN_TELEGRAM_USERNAME")
+                        ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        Toast.makeText(context, "Telegram ilovasini ochib bo'lmadi", Toast.LENGTH_LONG).show()
+                    }
+                }) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(Lucide.Send, null, tint = DalliPrimary, modifier = Modifier.size(16.dp))
+                        Text("Telegram orqali yozish", color = DalliPrimary, fontWeight = FontWeight.Bold)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showForgotDialog = false }) {
+                    Text("Yopish", color = DalliMuted)
+                }
+            }
+        )
     }
 
     Box(
@@ -95,12 +148,15 @@ fun LoginScreen(
                     colors = listOf(DalliPrimarySoft, DalliBackground)
                 )
             )
-            .padding(horizontal = 28.dp),
-        contentAlignment = Alignment.Center
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .imePadding()
+                .padding(horizontal = 28.dp, vertical = 40.dp),
+            verticalArrangement = Arrangement.Center
         ) {
             // Logo — soyali, gradient fon
             Box(
@@ -120,15 +176,14 @@ fun LoginScreen(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    painter = painterResource(id = R.drawable.ic_great_wall),
+                Image(
+                    painter = painterResource(id = R.drawable.logo_dalli_new),
                     contentDescription = "Dalli Shop",
-                    tint = DalliPrimary,
-                    modifier = Modifier.size(56.dp)
+                    modifier = Modifier.size(72.dp)
                 )
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(20.dp))
             Text(
                 text = "Xush kelibsiz",
                 fontSize = 26.sp,
@@ -136,102 +191,122 @@ fun LoginScreen(
                 color = DalliText,
                 textAlign = TextAlign.Center
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(6.dp))
             Text(
-                text = "Dalli Shop'ga Telegram orqali bir bosishda kiring",
+                text = if (uiState.mode == AuthMode.LOGIN)
+                    "Hisobingizga kiring"
+                else
+                    "Yangi hisob yarating",
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 color = DalliMuted,
                 textAlign = TextAlign.Center
             )
 
-            Spacer(Modifier.height(40.dp))
+            Spacer(Modifier.height(24.dp))
 
-            when (val state = uiState) {
-                is LoginUiState.Starting, is LoginUiState.Waiting -> {
-                    // Kutish kartochkasi
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .shadow(
-                                elevation = 8.dp,
-                                shape = RoundedCornerShape(20.dp),
-                                ambientColor = DalliPrimary.copy(alpha = 0.1f),
-                                spotColor = DalliPrimary.copy(alpha = 0.1f)
-                            )
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(DalliSurface)
-                            .padding(24.dp),
-                        contentAlignment = Alignment.Center
+            ModeTabs(
+                mode = uiState.mode,
+                enabled = !uiState.isLoading,
+                onModeChange = { viewModel.switchMode(it) }
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            // Forma kartochkasi
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .shadow(
+                        elevation = 8.dp,
+                        shape = RoundedCornerShape(20.dp),
+                        ambientColor = DalliPrimary.copy(alpha = 0.1f),
+                        spotColor = DalliPrimary.copy(alpha = 0.1f)
+                    )
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(DalliSurface)
+                    .padding(20.dp)
+            ) {
+                if (uiState.mode == AuthMode.REGISTER) {
+                    AuthTextField(
+                        value = uiState.fullname,
+                        onValueChange = viewModel::onFullnameChange,
+                        label = "Ism familiya",
+                        leadingIcon = { Icon(Lucide.User, null, tint = DalliMuted, modifier = Modifier.size(20.dp)) },
+                        error = uiState.fullnameError,
+                        enabled = !uiState.isLoading
+                    )
+                    Spacer(Modifier.height(14.dp))
+                }
+
+                AuthTextField(
+                    value = uiState.phoneDigits,
+                    onValueChange = viewModel::onPhoneChange,
+                    label = "Telefon raqam",
+                    leadingIcon = { Icon(Lucide.Phone, null, tint = DalliMuted, modifier = Modifier.size(20.dp)) },
+                    prefix = {
+                        Text("+998 ", color = DalliText, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                    },
+                    keyboardType = KeyboardType.Number,
+                    error = uiState.phoneError,
+                    enabled = !uiState.isLoading
+                )
+
+                Spacer(Modifier.height(14.dp))
+
+                PasswordField(
+                    value = uiState.password,
+                    onValueChange = viewModel::onPasswordChange,
+                    label = if (uiState.mode == AuthMode.REGISTER) "Parol (kamida 6 belgi)" else "Parol",
+                    error = uiState.passwordError,
+                    enabled = !uiState.isLoading
+                )
+
+                if (uiState.mode == AuthMode.REGISTER) {
+                    Spacer(Modifier.height(14.dp))
+                    PasswordField(
+                        value = uiState.confirmPassword,
+                        onValueChange = viewModel::onConfirmPasswordChange,
+                        label = "Parolni tasdiqlang",
+                        error = uiState.confirmError,
+                        enabled = !uiState.isLoading
+                    )
+                }
+
+                if (uiState.generalError != null) {
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = uiState.generalError!!,
+                        color = DalliError,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                Spacer(Modifier.height(20.dp))
+
+                GradientSubmitButton(
+                    text = if (uiState.mode == AuthMode.LOGIN) "Kirish" else "Ro'yxatdan o'tish",
+                    isLoading = uiState.isLoading,
+                    onClick = { viewModel.submit() }
+                )
+
+                if (uiState.mode == AuthMode.LOGIN) {
+                    Spacer(Modifier.height(8.dp))
+                    TextButton(
+                        onClick = { showForgotDialog = true },
+                        enabled = !uiState.isLoading,
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            DalliLoadingIndicator(
-                                size = 56.dp,
-                                logoTint = DalliPrimary,
-                                dotColor = DalliPrimary
-                            )
-                            Spacer(Modifier.height(16.dp))
-                            Text(
-                                text = "Telegramda tasdiqlang...",
-                                fontSize = 14.5.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = DalliText,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = "Bot xabaridagi \"✅ Kirishni tasdiqlash\" tugmasini bosing",
-                                fontSize = 12.5.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = DalliMuted,
-                                textAlign = TextAlign.Center
-                            )
-                        }
-                    }
-
-                    Spacer(Modifier.height(20.dp))
-                    TextButton(onClick = { viewModel.cancelAndRetry() }) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Icon(Lucide.RefreshCw, null, tint = DalliPrimary, modifier = Modifier.size(16.dp))
-                            Text(
-                                text = "Qaytadan urinish",
-                                fontSize = 14.sp,
-                                color = DalliPrimary,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-                }
-
-                is LoginUiState.Timeout -> {
-                    TimeoutHelp(
-                        onRetryFromStart = { viewModel.startLogin() },
-                        onReopenTelegram = { viewModel.reopenTelegram() }
-                    )
-                }
-
-                else -> {
-                    if (state is LoginUiState.Error) {
                         Text(
-                            text = state.message,
+                            "Parolni unutdingizmi?",
+                            color = DalliPrimary,
                             fontSize = 13.5.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = DalliMuted,
-                            textAlign = TextAlign.Center
+                            fontWeight = FontWeight.SemiBold
                         )
-                        Spacer(Modifier.height(16.dp))
                     }
-                    GradientLoginButton(
-                        text = if (state is LoginUiState.Error) "Qaytadan urinib ko'rish"
-                               else "Telegram orqali kirish",
-                        icon = if (state !is LoginUiState.Error) ({
-                            Icon(Lucide.Send, null, tint = Color.White, modifier = Modifier.size(18.dp))
-                        }) else null,
-                        onClick = { viewModel.startLogin() }
-                    )
                 }
             }
         }
@@ -239,125 +314,159 @@ fun LoginScreen(
 }
 
 @Composable
-private fun TimeoutHelp(
-    onRetryFromStart: () -> Unit,
-    onReopenTelegram: () -> Unit
+private fun ModeTabs(
+    mode: AuthMode,
+    enabled: Boolean,
+    onModeChange: (AuthMode) -> Unit
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .background(DalliSurface.copy(alpha = 0.7f))
+            .padding(5.dp)
     ) {
-        Icon(
-            imageVector = Icons.Default.Schedule,
-            contentDescription = null,
-            tint = DalliMuted,
-            modifier = Modifier.size(52.dp)
-        )
-        Spacer(Modifier.height(14.dp))
+        ModeTab("Kirish", mode == AuthMode.LOGIN, enabled, Modifier.weight(1f)) {
+            onModeChange(AuthMode.LOGIN)
+        }
+        ModeTab("Ro'yxatdan o'tish", mode == AuthMode.REGISTER, enabled, Modifier.weight(1f)) {
+            onModeChange(AuthMode.REGISTER)
+        }
+    }
+}
+
+@Composable
+private fun ModeTab(
+    text: String,
+    selected: Boolean,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val bg by animateColorAsState(
+        targetValue = if (selected) DalliPrimary else Color.Transparent,
+        label = "tabBg"
+    )
+    val textColor by animateColorAsState(
+        targetValue = if (selected) Color.White else DalliMuted,
+        label = "tabText"
+    )
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(bg)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                enabled = enabled
+            ) { onClick() }
+            .padding(vertical = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
         Text(
-            "Vaqt tugadi",
-            fontSize = 20.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = DalliText
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "2 daqiqa ichida tasdiqlanmadi. Quyidagilardan birini sinab ko'ring:",
+            text = text,
             fontSize = 13.5.sp,
-            color = DalliMuted,
-            textAlign = TextAlign.Center,
-            lineHeight = 20.sp
+            fontWeight = FontWeight.Bold,
+            color = textColor
         )
-        Spacer(Modifier.height(20.dp))
+    }
+}
 
-        HelpOption(
-            icon = Icons.AutoMirrored.Filled.OpenInNew,
-            title = "Telegram ochilmadimi?",
-            description = "Qayta urinib, Telegram havolasini ochishga harakat qiling",
-            buttonText = "Telegramni ochish",
-            onClick = onReopenTelegram
+@Composable
+private fun AuthTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    leadingIcon: @Composable (() -> Unit)? = null,
+    prefix: @Composable (() -> Unit)? = null,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    error: String? = null,
+    enabled: Boolean = true,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    trailingIcon: @Composable (() -> Unit)? = null
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            label = { Text(label, fontSize = 13.5.sp) },
+            leadingIcon = leadingIcon,
+            prefix = prefix,
+            trailingIcon = trailingIcon,
+            singleLine = true,
+            enabled = enabled,
+            isError = error != null,
+            visualTransformation = visualTransformation,
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+            shape = RoundedCornerShape(14.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = DalliPrimary,
+                unfocusedBorderColor = DalliLine,
+                errorBorderColor = DalliError,
+                focusedLabelColor = DalliPrimary,
+                unfocusedLabelColor = DalliMuted,
+                errorLabelColor = DalliError,
+                cursorColor = DalliPrimary,
+                focusedTextColor = DalliText,
+                unfocusedTextColor = DalliText
+            ),
+            modifier = Modifier.fillMaxWidth()
         )
-
-        Spacer(Modifier.height(10.dp))
-
-        HelpOption(
-            icon = Icons.Default.TouchApp,
-            title = "Botda tugmani bosdingizmi?",
-            description = "Telegram'da @dalli_login_robot ga o'tib, \"✅ Kirishni tasdiqlash\" tugmasini bosing",
-            buttonText = null,
-            onClick = {}
-        )
-
-        Spacer(Modifier.height(20.dp))
-
-        Button(
-            onClick = onRetryFromStart,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(54.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = DalliPrimary)
-        ) {
+        if (error != null) {
             Text(
-                "Qaytadan boshlash",
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp
+                text = error,
+                color = DalliError,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(start = 4.dp, top = 4.dp)
             )
         }
     }
 }
 
 @Composable
-private fun HelpOption(
-    icon: ImageVector,
-    title: String,
-    description: String,
-    buttonText: String?,
-    onClick: () -> Unit
+private fun PasswordField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    error: String? = null,
+    enabled: Boolean = true
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(DalliSurface)
-            .padding(16.dp)
-    ) {
-        Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(icon, null, tint = DalliPrimary, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(title, fontWeight = FontWeight.Bold, color = DalliText, fontSize = 14.sp)
-            }
-            Spacer(Modifier.height(6.dp))
-            Text(description, color = DalliMuted, fontSize = 13.sp, lineHeight = 18.sp)
-            if (buttonText != null) {
-                Spacer(Modifier.height(10.dp))
-                OutlinedButton(
-                    onClick = onClick,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.5.dp, DalliPrimary),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = DalliPrimary)
-                ) {
-                    Text(buttonText, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                }
+    var visible by remember { mutableStateOf(false) }
+    AuthTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = label,
+        leadingIcon = { Icon(Lucide.Lock, null, tint = DalliMuted, modifier = Modifier.size(20.dp)) },
+        keyboardType = KeyboardType.Password,
+        error = error,
+        enabled = enabled,
+        visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
+        trailingIcon = {
+            IconButton(onClick = { visible = !visible }) {
+                Icon(
+                    imageVector = if (visible) Lucide.EyeOff else Lucide.Eye,
+                    contentDescription = if (visible) "Parolni yashirish" else "Parolni ko'rsatish",
+                    tint = DalliMuted,
+                    modifier = Modifier.size(20.dp)
+                )
             }
         }
-    }
+    )
 }
 
 @Composable
-private fun GradientLoginButton(
+private fun GradientSubmitButton(
     text: String,
-    icon: (@Composable () -> Unit)? = null,
+    isLoading: Boolean,
     onClick: () -> Unit
 ) {
     Button(
         onClick = onClick,
+        enabled = !isLoading,
         modifier = Modifier
             .fillMaxWidth()
-            .height(58.dp)
+            .height(56.dp)
             .shadow(
                 elevation = 12.dp,
                 shape = RoundedCornerShape(18.dp),
@@ -365,7 +474,10 @@ private fun GradientLoginButton(
                 spotColor = DalliPrimary.copy(alpha = 0.35f)
             ),
         shape = RoundedCornerShape(18.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color.Transparent,
+            disabledContainerColor = Color.Transparent
+        ),
         contentPadding = PaddingValues(),
         elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
     ) {
@@ -379,11 +491,13 @@ private fun GradientLoginButton(
                 ),
             contentAlignment = Alignment.Center
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                icon?.invoke()
+            if (isLoading) {
+                CircularProgressIndicator(
+                    color = Color.White,
+                    strokeWidth = 2.5.dp,
+                    modifier = Modifier.size(24.dp)
+                )
+            } else {
                 Text(
                     text = text,
                     fontSize = 16.sp,
