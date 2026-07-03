@@ -75,8 +75,7 @@ import com.composables.icons.lucide.Phone
 import com.composables.icons.lucide.Send
 import com.composables.icons.lucide.User
 
-// TODO: Admin haqiqiy Telegram username'i bilan almashtiring
-private const val ADMIN_TELEGRAM_USERNAME = "ADMIN_USERNAME"
+private const val ADMIN_TELEGRAM_USERNAME = "dalli_shop_admin"
 
 @Composable
 fun LoginScreen(
