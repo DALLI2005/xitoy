@@ -422,6 +422,136 @@ async def auth_check(login_token: str):
     return {"status": "pending"}
 
 
+# ── Telefon + parol auth (mijoz ilovasi, SMS'siz) ──────────────────────────────
+def _hash_password(password: str, salt: str) -> str:
+    return hashlib.scrypt(
+        password.encode(), salt=salt.encode(),
+        n=16384, r=8, p=1
+    ).hex()
+
+
+def _generate_user_id() -> int:
+    # 9 bilan boshlanadigan 10 xonali — real telegram_id lar
+    # bilan to'qnashmasligi uchun
+    return int("9" + "".join(str(random.randint(0, 9)) for _ in range(9)))
+
+
+def _normalize_phone(phone: str) -> str:
+    return phone.strip().replace(" ", "")
+
+
+class RegisterIn(BaseModel):
+    fullname: str
+    phone: str
+    password: str
+
+
+class LoginIn(BaseModel):
+    phone: str
+    password: str
+
+
+@app.post("/auth/register")
+async def register_user(data: RegisterIn):
+    fullname = data.fullname.strip()
+    phone = _normalize_phone(data.phone)
+    password = data.password
+
+    if len(fullname) < 3:
+        raise HTTPException(400, "Ism juda qisqa")
+    if not (phone.startswith("+998") and len(phone) == 13 and phone[1:].isdigit()):
+        raise HTTPException(400, "Telefon raqam noto'g'ri formatda (+998XXXXXXXXX)")
+    if len(password) < 6:
+        raise HTTPException(400, "Parol kamida 6 belgidan iborat bo'lishi kerak")
+
+    salt = secrets.token_hex(16)
+    pwd_hash = await asyncio.to_thread(_hash_password, password, salt)
+    token = secrets.token_hex(32)
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT user_id FROM app_users WHERE phone = ?", (phone,)
+        ) as cur:
+            if await cur.fetchone():
+                raise HTTPException(409, "Bu raqam allaqachon ro'yxatdan o'tgan")
+        # user_id tasodifiy — juda kam ehtimolli to'qnashuvda qayta urinamiz
+        for _ in range(5):
+            user_id = _generate_user_id()
+            try:
+                await db.execute(
+                    "INSERT INTO app_users (user_id, phone, fullname, password_hash, salt, session_token) VALUES (?,?,?,?,?,?)",
+                    (user_id, phone, fullname, pwd_hash, salt, token),
+                )
+                await db.commit()
+                break
+            except aiosqlite.IntegrityError as e:
+                if "phone" in str(e):
+                    raise HTTPException(409, "Bu raqam allaqachon ro'yxatdan o'tgan")
+        else:
+            raise HTTPException(500, "ID yaratib bo'lmadi, qayta urinib ko'ring")
+
+    # Google Sheets Users varag'iga ham qo'shish — buyurtma/admin oqimlari
+    # ishlashi uchun (login_bot.py dagi saveUser patterni bilan bir xil)
+    try:
+        await sheets_post({
+            "action":        "saveUser",
+            "telegram_id":   str(user_id),
+            "username":      "",
+            "fullname":      fullname,
+            "phone":         phone,
+            "latitude":      "",
+            "longitude":     "",
+            "location_link": "",
+            "ro_yxat_sana":  datetime.now(_UZB_TZ).strftime("%Y-%m-%d %H:%M"),
+        })
+    except Exception as e:
+        log.warning("Sheets'ga user qo'shishda xato: %s", e)
+
+    return {
+        "ok": True,
+        "user_id": user_id,
+        "token": token,
+        "fullname": fullname,
+        "phone": phone,
+    }
+
+
+@app.post("/auth/login-password")
+async def login_password(data: LoginIn):
+    phone = _normalize_phone(data.phone)
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT user_id, fullname, password_hash, salt FROM app_users WHERE phone = ?",
+            (phone,),
+        ) as cur:
+            row = await cur.fetchone()
+
+    if not row:
+        raise HTTPException(404, "Bu raqam ro'yxatdan o'tmagan")
+
+    user_id, fullname, stored_hash, salt = row
+    attempt_hash = await asyncio.to_thread(_hash_password, data.password, salt)
+    if not hmac.compare_digest(attempt_hash, stored_hash):
+        raise HTTPException(401, "Parol noto'g'ri")
+
+    token = secrets.token_hex(32)
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE app_users SET session_token = ? WHERE user_id = ?",
+            (token, user_id),
+        )
+        await db.commit()
+
+    return {
+        "ok": True,
+        "user_id": user_id,
+        "token": token,
+        "fullname": fullname,
+        "phone": phone,
+    }
+
+
 # ── Telegram auth ──────────────────────────────────────────────────────────────
 def _verify_init_data(init_data: str) -> dict:
     """Telegram WebApp initData ni tekshiradi, user dict qaytaradi."""
