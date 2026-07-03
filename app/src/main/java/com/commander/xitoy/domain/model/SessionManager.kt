@@ -62,7 +62,8 @@ object SessionManager {
         username: String,
         fullname: String = "",
         phone: String = "",
-        address: String = ""
+        address: String = "",
+        token: String = ""
     ) {
         prefs?.edit()?.also { e ->
             e.putBoolean(KEY_LOGGED_IN, true)
@@ -72,9 +73,10 @@ object SessionManager {
             e.putString(KEY_FULLNAME, fullname)
             e.putString(KEY_PHONE, phone)
             e.putString(KEY_ADDRESS, address)
+            e.putString(KEY_TOKEN, token)
             e.apply()
         }
-        _session.value = UserSession(telegramId, ism, username, fullname, phone, address)
+        _session.value = UserSession(telegramId, ism, username, fullname, phone, address, token)
         appContext?.let { OnboardingManager.markCompletedOnce(it) }
     }
 
