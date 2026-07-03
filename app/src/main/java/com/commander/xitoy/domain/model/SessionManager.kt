@@ -13,7 +13,8 @@ data class UserSession(
     val username: String,
     val fullname: String = "",
     val phone: String = "",
-    val address: String = ""
+    val address: String = "",
+    val token: String = ""
 )
 
 // Ilova bo'ylab yagona login sessiyasi (Singleton) — SharedPreferences orqali saqlanadi.
