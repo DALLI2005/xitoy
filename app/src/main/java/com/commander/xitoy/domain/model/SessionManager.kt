@@ -47,7 +47,8 @@ object SessionManager {
                 username = p.getString(KEY_USERNAME, "") ?: "",
                 fullname = p.getString(KEY_FULLNAME, "") ?: "",
                 phone = p.getString(KEY_PHONE, "") ?: "",
-                address = p.getString(KEY_ADDRESS, "") ?: ""
+                address = p.getString(KEY_ADDRESS, "") ?: "",
+                token = p.getString(KEY_TOKEN, "") ?: ""
             )
         }
     }
