@@ -20,11 +20,16 @@ Tahrirlash:
 """
 
 import asyncio
+import hashlib
 import html as _html
 import logging
 import json
 import base64
 import os
+import random
+import secrets
+import sqlite3
+import string
 import urllib.request
 import urllib.parse
 from datetime import datetime, timezone
@@ -53,6 +58,9 @@ APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwYNusH54O3kyMAVcdkzp
 IMGBB_API_KEY   = "522bbbf3e6288c721c691d7ef773979e"
 CHANNEL_ID      = os.environ.get("CHANNEL_ID", "")
 
+# Ilova foydalanuvchilari (telefon+parol auth) — backend bilan bir xil DB
+APP_USERS_DB    = "/opt/xitoy_webapp/backend/admins.db"
+
 CATEGORIES = ["Kiyim", "Elektronika", "Poyabzal", "Aksessuar", "Sport", "Uy uchun", "Boshqa"]
 
 # Bot obyekti — post_init da o'rnatiladi, discount_checker da ishlatiladi
@@ -78,7 +86,8 @@ HELP_TEXT = (
     "Kategoriyalar: Kiyim, Elektronika, Poyabzal, Aksessuar, Sport, Uy uchun, Boshqa\n\n"
     "/list — tovarlar ro'yxati \\(inline boshqaruv\\)\n"
     "/outofstock — faqat tugagan tovarlar\n"
-    "/inactive — faqat nofaol tovarlar\n\n"
+    "/inactive — faqat nofaol tovarlar\n"
+    "/parol \\+998XXXXXXXXX — foydalanuvchi parolini tiklash\n\n"
     "*Tahrirlash:* /list → ✏️ Tahrirlash tugmasi → yangi ma'lumot yuboring\n"
     "/bekor — joriy tahrirlashni bekor qilish"
 )
@@ -733,6 +742,83 @@ async def cmd_bekor(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Hozir hech qanday faol jarayon yo'q.")
 
 
+# ── /parol — foydalanuvchi parolini tiklash ───────────────────────────────────
+
+def _hash_password(password: str, salt: str) -> str:
+    # Backend main.py dagi bilan aynan bir xil bo'lishi SHART
+    return hashlib.scrypt(
+        password.encode(), salt=salt.encode(),
+        n=16384, r=8, p=1
+    ).hex()
+
+
+def _reset_user_password(phone: str, temp_password: str):
+    """app_users da parolni yangilaydi. Topilmasa None, aks holda (user_id, fullname)."""
+    conn = sqlite3.connect(APP_USERS_DB)
+    try:
+        row = conn.execute(
+            "SELECT user_id, fullname FROM app_users WHERE phone = ?",
+            (phone,)
+        ).fetchone()
+        if not row:
+            return None
+        user_id, fullname = row
+        salt = secrets.token_hex(16)
+        pwd_hash = _hash_password(temp_password, salt)
+        # session_token ham tozalanadi — eski sessiya bekor bo'ladi
+        conn.execute(
+            "UPDATE app_users SET password_hash = ?, salt = ?, session_token = NULL WHERE user_id = ?",
+            (pwd_hash, salt, user_id)
+        )
+        conn.commit()
+        return user_id, fullname
+    finally:
+        conn.close()
+
+
+async def cmd_parol(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_admin(update):
+        return
+
+    args = context.args
+    if not args:
+        await update.message.reply_text(
+            "Foydalanish: /parol +998XXXXXXXXX"
+        )
+        return
+
+    phone = args[0].strip().replace(" ", "")
+    if not (phone.startswith("+998") and len(phone) == 13):
+        await update.message.reply_text(
+            "❌ Raqam formati noto'g'ri. Misol: /parol +998916669952"
+        )
+        return
+
+    # Yangi vaqtinchalik parol: "dalli" + 4 raqam
+    temp_password = "dalli" + "".join(random.choices(string.digits, k=4))
+
+    try:
+        result = await asyncio.to_thread(_reset_user_password, phone, temp_password)
+        if result is None:
+            await update.message.reply_text(
+                f"❌ {phone} raqami ro'yxatdan o'tmagan."
+            )
+            return
+
+        _, fullname = result
+        await update.message.reply_text(
+            f"✅ Parol yangilandi\n\n"
+            f"👤 {_html.escape(fullname)}\n"
+            f"📱 {phone}\n"
+            f"🔑 Yangi parol: <code>{temp_password}</code>\n\n"
+            f"Bu parolni foydalanuvchiga yuboring. U kirgandan "
+            f"keyin xohlasa o'zgartirishi mumkin bo'ladi.",
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        await update.message.reply_text(f"❌ Xato: {e}")
+
+
 # ── Callback handler (inline tugmalar) ───────────────────────────────────────
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1089,6 +1175,7 @@ def main():
     app.add_handler(CommandHandler("outofstock", cmd_outofstock))
     app.add_handler(CommandHandler("inactive",   cmd_inactive))
     app.add_handler(CommandHandler("bekor",      cmd_bekor))
+    app.add_handler(CommandHandler("parol",      cmd_parol))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
