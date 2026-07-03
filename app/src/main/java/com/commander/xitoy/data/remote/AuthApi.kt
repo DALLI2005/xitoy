@@ -38,6 +38,17 @@ data class LoginRequest(
     @SerializedName("password") val password: String
 )
 
+data class ChangePasswordRequest(
+    @SerializedName("user_id")      val userId: Long,
+    @SerializedName("old_password") val oldPassword: String,
+    @SerializedName("new_password") val newPassword: String
+)
+
+data class ChangePasswordResponse(
+    @SerializedName("ok")    val ok: Boolean,
+    @SerializedName("token") val token: String
+)
+
 data class AuthResponse(
     @SerializedName("ok")       val ok: Boolean,
     @SerializedName("user_id")  val userId: Long,
