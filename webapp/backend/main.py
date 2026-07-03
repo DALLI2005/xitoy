@@ -297,6 +297,19 @@ async def init_db():
         await db.execute(
             "CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(telegram_id)"
         )
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS app_users (
+                user_id       INTEGER PRIMARY KEY,
+                phone         TEXT UNIQUE NOT NULL,
+                fullname      TEXT NOT NULL,
+                password_hash TEXT NOT NULL,
+                salt          TEXT NOT NULL,
+                session_token TEXT,
+                created_at    INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+            )
+        """)
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_app_users_phone ON app_users(phone)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_app_users_token ON app_users(session_token)")
         # Superadmin — barcha kategoriyalar
         await db.execute("""
             INSERT OR IGNORE INTO admins (telegram_id, name, categories)
