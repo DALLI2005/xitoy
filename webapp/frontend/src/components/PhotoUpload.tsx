@@ -48,7 +48,7 @@ export default function PhotoUpload({ files, onChange, disabled }: Props) {
           </div>
         ))}
 
-        {files.length < 8 && !disabled && (
+        {!disabled && (
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
