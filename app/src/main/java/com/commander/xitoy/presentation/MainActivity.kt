@@ -209,6 +209,18 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable(
+                            "profit_calculator",
+                            enterTransition = slideEnter,
+                            exitTransition = slideExit,
+                            popEnterTransition = slidePopEnter,
+                            popExitTransition = slidePopExit
+                        ) {
+                            ProfitCalculatorScreen(
+                                onBackClick = { rootNavController.popBackStack() }
+                            )
+                        }
+
+                        composable(
                             "sales",
                             enterTransition = slideEnter,
                             exitTransition = slideExit,
