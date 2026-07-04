@@ -450,16 +450,19 @@ private fun ProfileStatsRow(stats: ProfileViewModel.ProfileStats) {
 // -------------------------------------------------------------------------
 // Menyu ro'yxati
 // -------------------------------------------------------------------------
+private const val MENU_PREFS = "dalli_prefs"
+private const val KEY_RATE_ALERT = "rate_alert_enabled"
+
 @Composable
-private fun ProfileMenuCard() {
-    val menu = listOf(
-        Icons.Default.LocationOn to "Yetkazib berish manzillari",
-        Icons.Default.Calculate to "Foyda kalkulyatori",
-        Icons.Default.Notifications to "Kurs o'zgarishi xabarnomasi",
-        Icons.Default.Language to "Til · O'zbekcha",
-        Icons.Default.Inventory2 to "Bojxona hujjatlari",
-        Icons.Default.SupportAgent to "Yordam markazi"
-    )
+private fun ProfileMenuCard(onCalculatorClick: () -> Unit) {
+    val context = LocalContext.current
+    val prefs = remember {
+        context.getSharedPreferences(MENU_PREFS, android.content.Context.MODE_PRIVATE)
+    }
+    var rateAlertEnabled by remember {
+        mutableStateOf(prefs.getBoolean(KEY_RATE_ALERT, true))
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -468,19 +471,57 @@ private fun ProfileMenuCard() {
         border = BorderStroke(1.dp, DalliLine)
     ) {
         Column {
-            menu.forEachIndexed { index, (icon, label) ->
-                if (index > 0) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(1.dp)
-                            .background(DalliLine)
-                    )
+            // Foyda kalkulyatori — alohida ekran
+            ProfileMenuItem(
+                icon = Icons.Default.Calculate,
+                title = "Foyda kalkulyatori",
+                onClick = onCalculatorClick
+            )
+            MenuDivider()
+            // Kurs o'zgarishi xabarnomasi — yoqish/o'chirish toggle
+            ProfileToggleItem(
+                icon = Icons.Default.Notifications,
+                title = "Kurs o'zgarishi xabarnomasi",
+                checked = rateAlertEnabled,
+                onCheckedChange = {
+                    rateAlertEnabled = it
+                    prefs.edit().putBoolean(KEY_RATE_ALERT, it).apply()
                 }
-                ProfileMenuItem(icon = icon, title = label, onClick = {})
-            }
+            )
+            MenuDivider()
+            // Yordam markazi — Telegram admin bilan bog'lanish
+            ProfileMenuItem(
+                icon = Icons.Default.SupportAgent,
+                title = "Yordam markazi",
+                onClick = {
+                    runCatching {
+                        context.startActivity(
+                            Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse("https://t.me/$ADMIN_TELEGRAM_USERNAME")
+                            ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                        )
+                    }.onFailure {
+                        Toast.makeText(
+                            context,
+                            "Telegram ilovasini ochib bo'lmadi",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            )
         }
     }
+}
+
+@Composable
+private fun MenuDivider() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(DalliLine)
+    )
 }
 
 @Composable
@@ -515,6 +556,48 @@ fun ProfileMenuItem(
             contentDescription = "O'tish",
             tint = DalliMuted,
             modifier = Modifier.size(18.dp)
+        )
+    }
+}
+
+@Composable
+private fun ProfileToggleItem(
+    icon: ImageVector,
+    title: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(horizontal = 15.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = title,
+            tint = DalliTextSecondary,
+            modifier = Modifier.size(19.dp)
+        )
+        Spacer(modifier = Modifier.width(13.dp))
+        Text(
+            text = title,
+            fontSize = 14.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = DalliText,
+            modifier = Modifier.weight(1f)
+        )
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = DalliPrimary,
+                uncheckedThumbColor = Color.White,
+                uncheckedTrackColor = DalliMuted.copy(alpha = 0.4f),
+                uncheckedBorderColor = Color.Transparent
+            )
         )
     }
 }
