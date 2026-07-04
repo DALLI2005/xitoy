@@ -68,7 +68,7 @@ export default function PhotoUpload({ files, onChange, disabled }: Props) {
 
       {files.length === 0 && (
         <p className="text-xs mt-2" style={{ color: 'var(--fg-muted)' }}>
-          Kamida 1 ta rasm (max 8 ta)
+          Kamida 1 ta rasm (cheklanmagan)
         </p>
       )}
 
