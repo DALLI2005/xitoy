@@ -55,6 +55,7 @@ import com.commander.xitoy.presentation.login.LoginScreen
 import com.commander.xitoy.presentation.main.MainScreen
 import com.commander.xitoy.presentation.notification.NotificationPermissionScreen
 import com.commander.xitoy.presentation.onboarding.OnboardingScreen
+import com.commander.xitoy.presentation.calculator.ProfitCalculatorScreen
 import com.commander.xitoy.presentation.payment.PaymentScreen
 import com.commander.xitoy.presentation.sales.SalesScreen
 import com.commander.xitoy.ui.theme.DalliMuted
