@@ -188,7 +188,7 @@ fun ProfileScreen(
         ProfileStatsRow(stats = stats)
         Spacer(modifier = Modifier.height(14.dp))
 
-        ProfileMenuCard()
+        ProfileMenuCard(onCalculatorClick = onCalculatorClick)
 
         Spacer(modifier = Modifier.height(16.dp))
         OutlinedButton(
