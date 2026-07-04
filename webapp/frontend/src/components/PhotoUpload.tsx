@@ -12,7 +12,7 @@ export default function PhotoUpload({ files, onChange, disabled }: Props) {
 
   function handleSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(e.target.files || [])
-    onChange([...files, ...selected].slice(0, 8))
+    onChange([...files, ...selected])
     e.target.value = ''
   }
 
