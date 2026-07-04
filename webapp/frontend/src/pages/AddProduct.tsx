@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { ImagePlus, DollarSign, Tag, Percent, AlignLeft, CheckCircle2, AlertCircle, Loader2, RefreshCw, TrendingUp, Clock, Megaphone, Languages } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { ImagePlus, Wallet, Tag, Percent, AlignLeft, CheckCircle2, AlertCircle, Loader2, Clock, Megaphone, Languages } from 'lucide-react'
 import { api } from '../api'
 import PhotoUpload from '../components/PhotoUpload'
 import { hapticSuccess, hapticError } from '../telegram'
@@ -7,42 +7,25 @@ import type { User } from '../types'
 
 interface Props { user: User }
 
-// Cargo narxi — real shartnoma bo'yicha $6/kg
-const CARGO_USD_PER_KG = 6
-// Sof foyda foizi — admin tomonidan belgilanadi, hozircha 10%
-const PROFIT_PERCENT = 10
-
-interface CategoryConfig {
-  // Taxminiy o'rtacha og'irlik (kg) — real tajriba asosida o'zgartirish mumkin
-  avgWeightKg: number
+// Tasodifiy butun son [min, max]
+function randInt(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min
+}
+// Sotilgan — 10 dan 100 gacha tasodifiy
+function randomSold(): number {
+  return randInt(10, 100)
+}
+// Reyting — 3.5 dan 4.5 gacha tasodifiy (bir xonali)
+function randomRating(): string {
+  return (randInt(0, 10) / 10 + 3.5).toFixed(1)
 }
 
-// Real cargo tajribasi asosida (2026-yil iyun), kg
-const CATEGORY_CONFIGS: Record<string, CategoryConfig> = {
-  'Aksessuar':   { avgWeightKg: 0.85 },
-  'Kiyim':       { avgWeightKg: 0.55 },
-  'Elektronika': { avgWeightKg: 0.40 },
-  'Boshqa':      { avgWeightKg: 0.40 },
-  'Sport':       { avgWeightKg: 0.60 },
-  'Poyabzal':    { avgWeightKg: 1.00 },
-  'Uy uchun':    { avgWeightKg: 1.00 },
-}
-
-function getConfig(category: string): CategoryConfig {
-  return CATEGORY_CONFIGS[category] ?? CATEGORY_CONFIGS['Boshqa']
-}
-
-function calcBreakdown(yuan: number, cnyRate: number, usdRate: number, config: CategoryConfig) {
-  const tannarx  = yuan * cnyRate
-  const cargo    = config.avgWeightKg * CARGO_USD_PER_KG * usdRate
-  const foyda    = tannarx * (PROFIT_PERCENT / 100)
-  const rawTotal = tannarx + cargo + foyda
-  const finalPrice = Math.floor(rawTotal / 1000) * 1000
-  return { tannarx, cargo, foyda, finalPrice }
-}
-
-function fmt(n: number): string {
-  return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+// Har safar yangi forma uchun tasodifiy reyting/sotilgan bilan
+function makeEmpty() {
+  return {
+    name: '', price: '', discount: '', category: '', description: '',
+    rating: randomRating(), sold_count: String(randomSold()),
+  }
 }
 
 type DiscountType = 'permanent' | 'temporary'
@@ -62,23 +45,14 @@ const DURATION_OPTIONS = [
   { label: "✏️ Boshqa (5 ga bo'linadigan)",    minutes: -1    },
 ]
 
-const EMPTY = { name: '', yuan: '', discount: '', category: '', description: '', rating: '4.5', sold_count: '10' }
-const RATE_KEY     = 'cny_rate_cache'
-const USD_RATE_KEY = 'usd_rate_cache'
-const USD_FALLBACK = 12700
-
 type ToastType = 'success' | 'error'
 interface Toast { type: ToastType; msg: string }
 
 export default function AddProduct({ user }: Props) {
-  const [form, setForm]               = useState(EMPTY)
+  const [form, setForm]               = useState(makeEmpty)
   const [photos, setPhotos]           = useState<File[]>([])
   const [loading, setLoading]         = useState(false)
   const [toast, setToast]             = useState<Toast | null>(null)
-  const [cnyRate, setCnyRate]         = useState<number | null>(null)
-  const [usdRate, setUsdRate]         = useState<number>(USD_FALLBACK)
-  const [rateLabel, setRateLabel]     = useState('')
-  const [rateLoading, setRateLoading] = useState(false)
   const [discountType, setDiscountType]     = useState<DiscountType>('permanent')
   const [selectedOption, setSelectedOption] = useState<number | null>(null)
   const [customMinutes, setCustomMinutes]   = useState('')
@@ -100,76 +74,6 @@ export default function AddProduct({ user }: Props) {
   }
 
   useEffect(() => () => clearTimeout(toastTimer.current), [])
-
-  const fetchRate = useCallback(async (force = false) => {
-    if (!force) {
-      try {
-        const cached = localStorage.getItem(RATE_KEY)
-        if (cached) {
-          const { rate, today } = JSON.parse(cached)
-          const todayStr = new Date().toISOString().slice(0, 10)
-          if (today === todayStr && rate > 0) {
-            setCnyRate(rate)
-            setRateLabel(`1 ¥ = ${fmt(rate)} so'm`)
-            return
-          }
-        }
-      } catch {}
-    }
-
-    setRateLoading(true)
-    try {
-      const res = await fetch('https://cbu.uz/uz/arkhiv-kursov-valyut/json/CNY/')
-      const data = await res.json()
-      const rate = parseFloat(data[0].Rate)
-      const dateStr: string = data[0].Date
-      setCnyRate(rate)
-      setRateLabel(`1 ¥ = ${fmt(rate)} so'm (${dateStr})`)
-      localStorage.setItem(RATE_KEY, JSON.stringify({
-        rate,
-        today: new Date().toISOString().slice(0, 10),
-      }))
-    } catch {
-      try {
-        const cached = localStorage.getItem(RATE_KEY)
-        if (cached) {
-          const { rate } = JSON.parse(cached)
-          setCnyRate(rate)
-          setRateLabel(`1 ¥ = ${fmt(rate)} so'm (offline)`)
-        } else {
-          setRateLabel('Kurs yuklanmadi')
-        }
-      } catch {
-        setRateLabel('Kurs yuklanmadi')
-      }
-    } finally {
-      setRateLoading(false)
-    }
-  }, [])
-
-  useEffect(() => { fetchRate() }, [fetchRate])
-
-  useEffect(() => {
-    const cached = localStorage.getItem(USD_RATE_KEY)
-    if (cached) {
-      try {
-        const { rate, today } = JSON.parse(cached)
-        if (today === new Date().toISOString().slice(0, 10) && rate > 0) {
-          setUsdRate(rate); return
-        }
-      } catch {}
-    }
-    fetch('https://cbu.uz/uz/arkhiv-kursov-valyut/json/USD/')
-      .then(r => r.json())
-      .then(data => {
-        const rate = parseFloat(data[0].Rate)
-        setUsdRate(rate)
-        localStorage.setItem(USD_RATE_KEY, JSON.stringify({
-          rate, today: new Date().toISOString().slice(0, 10)
-        }))
-      })
-      .catch(() => setUsdRate(USD_FALLBACK))
-  }, [])
 
   function set(field: string, value: string) {
     setForm(f => ({ ...f, [field]: value }))
@@ -195,11 +99,7 @@ export default function AddProduct({ user }: Props) {
     }))
   }
 
-  const yuanNum  = parseFloat(form.yuan) || 0
-  const config   = getConfig(form.category)
-  const breakdown = (yuanNum > 0 && cnyRate && form.category)
-    ? calcBreakdown(yuanNum, cnyRate, usdRate, config)
-    : null
+  const priceNum = parseInt(form.price) || 0
 
   async function handleTranslateAndShorten() {
     if (!form.name.trim()) return showToast('error', "Avval nom maydoniga matn kiriting")
@@ -217,11 +117,10 @@ export default function AddProduct({ user }: Props) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.name.trim())         return showToast('error', 'Tovar nomini kiriting')
-    if (!form.yuan || yuanNum <= 0) return showToast('error', 'Yuan narxini kiriting')
-    if (!cnyRate)                  return showToast('error', 'Valyuta kursi yuklanmadi')
-    if (!form.category)            return showToast('error', 'Kategoriyani tanlang')
-    if (!photos.length)            return showToast('error', "Kamida 1 ta rasm qo'shing")
+    if (!form.name.trim())          return showToast('error', 'Tovar nomini kiriting')
+    if (!priceNum || priceNum <= 0) return showToast('error', 'Narxni kiriting')
+    if (!form.category)             return showToast('error', 'Kategoriyani tanlang')
+    if (!photos.length)             return showToast('error', "Kamida 1 ta rasm qo'shing")
 
     const discountNum = parseInt(form.discount || '0') || 0
     if (discountNum > 0 && discountType === 'temporary') {
@@ -233,7 +132,8 @@ export default function AddProduct({ user }: Props) {
       }
     }
 
-    const finalPrice = calcBreakdown(yuanNum, cnyRate, usdRate, config).finalPrice
+    // Narx to'g'ridan-to'g'ri kiritilgan so'm qiymati
+    const finalPrice = priceNum
 
     const razmerMatritsa: Record<string, {nomi: string, narx: number}[]> = {}
     Object.entries(sizesByColor).forEach(([colorIdx, sizes]) => {
@@ -263,8 +163,8 @@ export default function AddProduct({ user }: Props) {
         description:      form.description.trim(),
         image_url:        urls[0],
         images:           urls,
-        rating:           parseFloat(form.rating) || 4.5,
-        sold_count:       parseInt(form.sold_count) || 10,
+        rating:           parseFloat(form.rating) || parseFloat(randomRating()),
+        sold_count:       parseInt(form.sold_count) || randomSold(),
         discount_type:    discountNum > 0 ? (discountType === 'temporary' ? 'vaqtinchalik' : 'doimiy') : 'doimiy',
         discount_expires: discountExpiresAt,
         auto_delete:      discountType === 'temporary' && autoDelete,
@@ -287,7 +187,7 @@ export default function AddProduct({ user }: Props) {
         ? `⏳ ${res.message}`
         : `"${form.name.trim()}" qo'shildi!`
       showToast('success', toastMsg)
-      setForm({ ...EMPTY })
+      setForm(makeEmpty())
       setPhotos([])
       setDiscountType('permanent')
       setSelectedOption(null)
@@ -523,35 +423,19 @@ export default function AddProduct({ user }: Props) {
             </div>
           </div>
 
-          {/* Rate indicator */}
-          <div className="flex items-center justify-between px-1">
-            <span className="text-xs" style={{ color: 'var(--fg-muted)' }}>
-              {rateLoading ? 'Kurs yuklanmoqda…' : rateLabel || 'Kurs yuklanmadi'}
-            </span>
-            <button
-              type="button"
-              onClick={() => fetchRate(true)}
-              disabled={rateLoading || loading}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', padding: 4, display: 'flex', alignItems: 'center' }}
-            >
-              <RefreshCw size={13} className={rateLoading ? 'animate-spin' : ''} />
-            </button>
-          </div>
-
           <div>
             <label className="flex items-center gap-2 text-xs font-medium mb-2" style={{ color: 'var(--fg-muted)' }}>
-              <DollarSign size={13} /> XITOYDAGI NARXI (¥ YUAN) <span style={{ color: 'var(--error)' }}>*</span>
+              <Wallet size={13} /> NARXI (SO'M) <span style={{ color: 'var(--error)' }}>*</span>
             </label>
             <input
               className="field"
               type="number"
-              inputMode="decimal"
-              value={form.yuan}
-              onChange={e => set('yuan', e.target.value)}
+              inputMode="numeric"
+              value={form.price}
+              onChange={e => set('price', e.target.value)}
               placeholder="0"
               disabled={loading}
               min={0}
-              step="0.01"
             />
           </div>
 
@@ -720,36 +604,6 @@ export default function AddProduct({ user }: Props) {
           </div>
         </section>
 
-        {/* Price breakdown */}
-        {breakdown && (
-          <section className="glass p-4">
-            <label className="flex items-center gap-2 text-xs font-medium mb-3" style={{ color: 'var(--fg-muted)' }}>
-              <TrendingUp size={13} /> NARX HISOBI
-            </label>
-            <div className="flex flex-col gap-2">
-              <Row
-                label={`Tannarx (${form.yuan}¥)`}
-                value={`${fmt(breakdown.tannarx)} so'm`}
-              />
-              <Row
-                label={`Cargo (${config.avgWeightKg}kg × $${CARGO_USD_PER_KG})`}
-                value={`+ ${fmt(breakdown.cargo)} so'm`}
-              />
-              <Row
-                label={`Foyda (${PROFIT_PERCENT}%)`}
-                value={`+ ${fmt(breakdown.foyda)} so'm`}
-              />
-              <div
-                className="flex justify-between text-base font-semibold pt-2 mt-1"
-                style={{ borderTop: '1px solid var(--border)', color: 'var(--fg)' }}
-              >
-                <span>JAMI NARX</span>
-                <span style={{ color: 'var(--accent-hover)' }}>{fmt(breakdown.finalPrice)} so'm</span>
-              </div>
-            </div>
-          </section>
-        )}
-
         {/* Rating + Sold count */}
         <section className="glass p-4 flex flex-col gap-3">
           <div className="flex gap-3">
@@ -784,6 +638,9 @@ export default function AddProduct({ user }: Props) {
               />
             </div>
           </div>
+          <p className="text-xs" style={{ color: 'var(--fg-muted)' }}>
+            Avtomatik tasodifiy qiymatlar qo'yildi — xohlasangiz o'zgartiring.
+          </p>
         </section>
 
         {/* Description */}
@@ -812,15 +669,6 @@ export default function AddProduct({ user }: Props) {
         </button>
 
       </form>
-    </div>
-  )
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between text-sm" style={{ color: 'var(--fg-muted)' }}>
-      <span>{label}</span>
-      <span>{value}</span>
     </div>
   )
 }
