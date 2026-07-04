@@ -345,6 +345,7 @@ fun MainScreen(
                 popEnterTransition = tabEnter, popExitTransition = tabExit) {
                 com.commander.xitoy.presentation.profile.ProfileScreen(
                     onLoginClick = { rootNavController.navigate("login") },
+                    onCalculatorClick = { rootNavController.navigate("profit_calculator") },
                     onLogout = {
                         rootNavController.navigate("login") {
                             popUpTo(0) { inclusive = true }
