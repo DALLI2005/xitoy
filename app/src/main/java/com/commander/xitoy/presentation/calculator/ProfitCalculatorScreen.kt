@@ -615,7 +615,7 @@ private fun ResultCard(
                         .background(if (hasInput) accent.copy(alpha = 0.12f) else DalliAccentSoft),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.TrendingUp, null, tint = if (hasInput) accent else DalliAccentInk, modifier = Modifier.size(19.dp))
+                    Icon(Icons.AutoMirrored.Filled.TrendingUp, null, tint = if (hasInput) accent else DalliAccentInk, modifier = Modifier.size(19.dp))
                 }
                 Spacer(Modifier.width(10.dp))
                 Text("Natija", fontWeight = FontWeight.ExtraBold, fontSize = 16.sp, color = DalliText)
