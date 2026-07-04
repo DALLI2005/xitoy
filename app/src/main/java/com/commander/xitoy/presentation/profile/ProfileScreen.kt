@@ -74,9 +74,13 @@ import com.commander.xitoy.ui.theme.DalliSurface
 import com.commander.xitoy.ui.theme.DalliText
 import com.commander.xitoy.ui.theme.DalliTextSecondary
 
+// Admin bilan Telegram orqali bog'lanish uchun username (LoginScreen bilan bir xil)
+private const val ADMIN_TELEGRAM_USERNAME = "dalli_shop_admin"
+
 @Composable
 fun ProfileScreen(
     onLoginClick: () -> Unit = {},
+    onCalculatorClick: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
     val viewModel: ProfileViewModel = hiltViewModel()
