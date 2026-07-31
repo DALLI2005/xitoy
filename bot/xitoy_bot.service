@@ -6,6 +6,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/opt/xitoy_bot
+EnvironmentFile=/opt/xitoy_bot/.env
 ExecStart=/opt/xitoy_bot/venv/bin/python bot.py
 Restart=always
 RestartSec=5

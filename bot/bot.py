@@ -48,14 +48,14 @@ from telegram.ext import (
     CallbackQueryHandler, filters, ContextTypes
 )
 
-WEBAPP_URL = "https://admin.eliboyev.uz"
+WEBAPP_URL = os.environ.get("WEBAPP_URL", "https://admin.eliboyev.uz")
 
 # ── Sozlamalar ────────────────────────────────────────────────────────────────
 
-BOT_TOKEN       = "8843675619:AAEGFzuFrRIS-Cuv1E9_uTAQ_WtFSCGmO-s"
-ADMIN_ID        = "5049583350"
-APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwYNusH54O3kyMAVcdkzpOaBiejRLrvj6EcXtfgh1m37aG79ZiUYRG_OcOEUa3GSkFi8A/exec"
-IMGBB_API_KEY   = "522bbbf3e6288c721c691d7ef773979e"
+BOT_TOKEN       = os.environ.get("BOT_TOKEN", "")
+ADMIN_ID        = os.environ.get("SUPERADMIN_ID", "")
+APPS_SCRIPT_URL = os.environ.get("APPS_SCRIPT_URL", "")
+IMGBB_API_KEY   = os.environ.get("IMGBB_API_KEY", "")
 CHANNEL_ID      = os.environ.get("CHANNEL_ID", "")
 
 # Ilova foydalanuvchilari (telefon+parol auth) — backend bilan bir xil DB
@@ -1161,6 +1161,9 @@ async def post_init(application):
 
 
 def main():
+    if not BOT_TOKEN:
+        raise SystemExit("❌ BOT_TOKEN topilmadi — .env faylga qo'shing: BOT_TOKEN=<token>")
+
     app = (
         Application.builder()
         .token(BOT_TOKEN)

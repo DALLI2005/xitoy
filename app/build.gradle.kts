@@ -9,11 +9,7 @@ plugins {
 
 android {
     namespace = "com.commander.xitoy"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.commander.xitoy"
@@ -70,9 +66,7 @@ dependencies {
     ksp("com.google.dagger:hilt-compiler:2.56.2")
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0") // Buni albatta qo'shish kerak
 
-    // Tarmoq so'rovlari va Server API bilan ishlash uchun (Retrofit)
-    implementation("com.squareup.retrofit2:retrofit:2.9.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    // (Retrofit yuqorida allaqachon qo'shilgan)
     // Network logging (Logcat'da so'rovlarni ko'rish uchun)
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 

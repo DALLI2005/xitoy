@@ -3,7 +3,16 @@
 set -e
 
 echo "=== 1. Bot fayllarini ko'chirish ==="
-scp bot.py requirements.txt root@176.101.56.158:/opt/xitoy_bot/
+scp bot.py requirements.txt apps_script.js root@176.101.56.158:/opt/xitoy_bot/
+
+# .env faylni yuborish (agar mavjud bo'lsa)
+if [ -f ".env" ]; then
+  scp .env root@176.101.56.158:/opt/xitoy_bot/.env
+  echo "  → .env yuborildi"
+else
+  echo "  ⚠️  DIQQAT: .env fayli topilmadi! Server da qo'lda yarating:"
+  echo "     ssh root@176.101.56.158 'nano /opt/xitoy_bot/.env'"
+fi
 
 echo "=== 2. Server sozlamalari ==="
 ssh root@176.101.56.158 << 'REMOTE'
