@@ -33,7 +33,17 @@ object SessionManager {
     private var prefs: SharedPreferences? = null
     private var appContext: Context? = null
 
-    private val _session = MutableStateFlow<UserSession?>(null)
+    private val guestSession = UserSession(
+        telegramId = "guest_user",
+        ism = "Foydalanuvchi",
+        username = "guest",
+        fullname = "Mehmon",
+        phone = "+998900000000",
+        address = "Rishton",
+        token = "guest_token"
+    )
+
+    private val _session = MutableStateFlow<UserSession?>(guestSession)
     val session: StateFlow<UserSession?> = _session.asStateFlow()
 
     fun init(context: Context) {
@@ -50,11 +60,14 @@ object SessionManager {
                 address = p.getString(KEY_ADDRESS, "") ?: "",
                 token = p.getString(KEY_TOKEN, "") ?: ""
             )
+        } else {
+            // Login/ro'yxatdan o'tish vaqtincha o'chirilgan — avtomatik mehmon seansi
+            _session.value = guestSession
         }
     }
 
     val isLoggedIn: Boolean
-        get() = _session.value != null
+        get() = true
 
     fun save(
         telegramId: String,
@@ -89,6 +102,6 @@ object SessionManager {
 
     fun logout() {
         prefs?.edit()?.clear()?.apply()
-        _session.value = null
+        _session.value = guestSession
     }
 }

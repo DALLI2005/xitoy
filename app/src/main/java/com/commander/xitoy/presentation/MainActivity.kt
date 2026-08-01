@@ -123,7 +123,7 @@ class MainActivity : ComponentActivity() {
 
                         composable("onboarding") {
                             OnboardingScreen(onFinish = {
-                                rootNavController.navigate("login") {
+                                rootNavController.navigate("notification_permission") {
                                     popUpTo("onboarding") { inclusive = true }
                                 }
                             })
