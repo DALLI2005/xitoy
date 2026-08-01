@@ -41,8 +41,8 @@ object RishtonLocationChecker {
                     Priority.PRIORITY_HIGH_ACCURACY,
                     cancellationTokenSource.token
                 )
-                    .addOnSuccessListener { loc -> cont.resume(loc) {} }
-                    .addOnFailureListener { cont.resume(null) {} }
+                    .addOnSuccessListener { loc -> cont.resumeWith(Result.success(loc)) }
+                    .addOnFailureListener { cont.resumeWith(Result.success(null)) }
 
                 cont.invokeOnCancellation { cancellationTokenSource.cancel() }
             } ?: return LocationResult(null, null, null)

@@ -41,9 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -81,7 +79,7 @@ fun PaymentScreen(
     val cardInfo   by viewModel.cardInfo.collectAsState()
     val uploadState by viewModel.uploadState.collectAsState()
     val context    = LocalContext.current
-    val clipboard  = LocalClipboardManager.current
+    val clipboardManager = context.getSystemService(android.content.ClipboardManager::class.java)
 
     var selectedUri by remember { mutableStateOf<android.net.Uri?>(null) }
 
@@ -179,7 +177,8 @@ fun PaymentScreen(
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(DalliPrimarySoft)
                                 .clickable {
-                                    clipboard.setText(AnnotatedString(cardInfo.cardNumber.replace(" ", "")))
+                                    val clip = android.content.ClipData.newPlainText("card", cardInfo.cardNumber.replace(" ", ""))
+                                    clipboardManager.setPrimaryClip(clip)
                                     Toast.makeText(context, "Karta raqami nusxalandi", Toast.LENGTH_SHORT).show()
                                 }
                                 .padding(horizontal = 16.dp, vertical = 14.dp),

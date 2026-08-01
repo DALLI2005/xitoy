@@ -8,6 +8,7 @@ import com.commander.xitoy.domain.model.Product
 import com.commander.xitoy.domain.model.SessionManager
 import com.commander.xitoy.domain.use_case.GetProductsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -69,6 +70,7 @@ class HomeViewModel @Inject constructor(
             initialValue = 0
         )
 
+    @OptIn(FlowPreview::class)
     val filteredProducts: StateFlow<List<Product>> = combine(
         _products,
         _searchQuery.debounce(300).onStart { emit("") },

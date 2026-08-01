@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import retrofit2.HttpException
 import javax.inject.Inject
 
@@ -153,12 +154,11 @@ class LoginViewModel @Inject constructor(
 
     private fun registerFcmToken(userId: String) {
         if (userId.isEmpty()) return
-        FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
-            viewModelScope.launch(Dispatchers.IO) {
-                try {
-                    authApi.registerFcmToken(FcmTokenRequest(userId, token))
-                } catch (_: Exception) {}
-            }
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val token = FirebaseMessaging.getInstance().token.await()
+                authApi.registerFcmToken(FcmTokenRequest(userId, token))
+            } catch (_: Exception) {}
         }
     }
 }

@@ -26,10 +26,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.StarHalf
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarHalf
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -403,7 +403,7 @@ private fun StarRow(rating: Float) {
             Icon(
                 imageVector = when {
                     filled -> Icons.Default.Star
-                    half   -> Icons.Default.StarHalf
+                    half   -> Icons.AutoMirrored.Filled.StarHalf
                     else   -> Icons.Outlined.StarOutline
                 },
                 contentDescription = null,
