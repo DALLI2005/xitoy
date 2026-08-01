@@ -319,6 +319,32 @@ async def init_db():
         """)
         await db.execute("CREATE INDEX IF NOT EXISTS idx_app_users_phone ON app_users(phone)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_app_users_token ON app_users(session_token)")
+
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS products (
+                id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+                name                 TEXT NOT NULL,
+                price                REAL NOT NULL,
+                discount             REAL DEFAULT 0,
+                category             TEXT NOT NULL,
+                description          TEXT DEFAULT '',
+                image_url            TEXT DEFAULT '',
+                images               TEXT DEFAULT '[]',
+                rating               REAL DEFAULT 4.5,
+                sold_count           INTEGER DEFAULT 0,
+                discount_type        TEXT DEFAULT 'doimiy',
+                discount_expires     TEXT DEFAULT '',
+                auto_delete          INTEGER DEFAULT 0,
+                active               INTEGER DEFAULT 1,
+                in_stock             INTEGER DEFAULT 1,
+                variantlar_yoqilgan  INTEGER DEFAULT 0,
+                variant_nomlari      TEXT DEFAULT '[]',
+                variant_narxlari     TEXT DEFAULT '[]',
+                razmer_matritsa      TEXT DEFAULT '{}',
+                added_by             TEXT DEFAULT '',
+                created_at           TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
         # Superadmin — barcha kategoriyalar
         await db.execute("""
             INSERT OR IGNORE INTO admins (telegram_id, name, categories)
@@ -1212,14 +1238,47 @@ async def get_categories():
 # ── /api/products ──────────────────────────────────────────────────────────────
 @app.get("/api/products")
 async def list_products(user: dict = Depends(get_current_user)):
-    products = await sheets_get()
-    if user["is_superadmin"]:
-        return products
-    allowed = set(user["categories"])
-    return [
-        p for p in products
-        if p.get("category") in allowed and p.get("active", True)
-    ]
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM products ORDER BY id DESC") as cur:
+            rows = await cur.fetchall()
+
+    allowed = set(user["categories"]) if not user["is_superadmin"] else None
+    products = []
+    for r in rows:
+        d = dict(r)
+        if allowed and d.get("category") not in allowed:
+            continue
+
+        images = json.loads(d.get("images") or "[]")
+        var_nom = json.loads(d.get("variant_nomlari") or "[]")
+        var_narx = json.loads(d.get("variant_narxlari") or "[]")
+        razmer = json.loads(d.get("razmer_matritsa") or "{}")
+
+        products.append({
+            "id":                 d["id"],
+            "title":              d["name"],
+            "name":               d["name"],
+            "description":        d.get("description", ""),
+            "price":              d.get("price", 0),
+            "discount":           d.get("discount", 0),
+            "discountPercent":    int(d.get("discount", 0)),
+            "category":           d.get("category", "Boshqa"),
+            "image":              d.get("image_url", ""),
+            "image_url":          d.get("image_url", ""),
+            "imageUrl":           d.get("image_url", ""),
+            "images":             images,
+            "sold_count":         d.get("sold_count", 0),
+            "rating":             d.get("rating", 4.5),
+            "active":             bool(d.get("active", 1)),
+            "in_stock":           bool(d.get("in_stock", 1)),
+            "inStock":            bool(d.get("in_stock", 1)),
+            "variantlarYoqilgan": bool(d.get("variantlar_yoqilgan", 0)),
+            "variantNomlari":     var_nom,
+            "variantNarxlari":    var_narx,
+            "razmerMatritsa":     razmer,
+        })
+    return products
 
 
 @app.patch("/api/products/{product_id}")
@@ -1231,22 +1290,13 @@ async def patch_product(
     if patch.active is None and patch.in_stock is None:
         raise HTTPException(400, "Hech narsa o'zgartirilmadi")
 
-    if patch.active is not None:
-        await sheets_post({
-            "type":  "updateProduct",
-            "id":    product_id,
-            "field": "active",
-            "value": int(patch.active),
-        })
-    if patch.in_stock is not None:
-        await sheets_post({
-            "type":  "updateProduct",
-            "id":    product_id,
-            "field": "inStock",
-            "value": int(patch.in_stock),
-        })
+    async with aiosqlite.connect(DB_PATH) as db:
+        if patch.active is not None:
+            await db.execute("UPDATE products SET active = ? WHERE id = ?", (1 if patch.active else 0, product_id))
+        if patch.in_stock is not None:
+            await db.execute("UPDATE products SET in_stock = ? WHERE id = ?", (1 if patch.in_stock else 0, product_id))
+        await db.commit()
 
-    name = str(product_id)
     if patch.active is not None:
         status = "faollashtirildi" if patch.active else "o'chirildi"
         await notify(f"{'✅' if patch.active else '🔴'} Tovar #{product_id} <b>{status}</b>")
@@ -1267,7 +1317,19 @@ async def update_product(
     if not payload:
         raise HTTPException(400, "Hech narsa o'zgartirilmadi")
 
-    await sheets_post({"type": "edit_product", "id": product_id, **payload})
+    async with aiosqlite.connect(DB_PATH) as db:
+        fields, values = [], []
+        for k, v in payload.items():
+            if isinstance(v, (list, dict)):
+                v = json.dumps(v)
+            elif isinstance(v, bool):
+                v = 1 if v else 0
+            fields.append(f"{k} = ?")
+            values.append(v)
+        values.append(product_id)
+        await db.execute(f"UPDATE products SET {', '.join(fields)} WHERE id = ?", values)
+        await db.commit()
+
     await notify(f"✏️ Tovar #{product_id} <b>tahrirlandi</b> ({user['name']})")
     return {"ok": True}
 
@@ -1277,9 +1339,19 @@ async def delete_product(
     product_id: int,
     user: dict = Depends(require_super),
 ):
-    await sheets_post({"type": "delete_product", "id": product_id})
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM products WHERE id = ?", (product_id,))
+        await db.commit()
     await notify(f"🗑 Tovar #{product_id} <b>o'chirildi</b> ({user['name']})")
     return {"ok": True}
+
+
+@app.delete("/api/admin/clear-all-products")
+async def clear_all_products(user: dict = Depends(require_super)):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM products")
+        await db.commit()
+    return {"ok": True, "message": "Barcha tovarlar o'chirildi"}
 
 
 @app.post("/api/products", status_code=201)
@@ -1287,35 +1359,41 @@ async def add_product(product: ProductIn, user: dict = Depends(get_current_user)
     if product.category not in user["categories"]:
         raise HTTPException(403, f"'{product.category}' kategoriyasiga ruxsat yo'q")
 
+    images_json = json.dumps(product.images or ([product.image_url] if product.image_url else []))
+    var_nom_json = json.dumps(product.variant_nomlari or [])
+    var_narx_json = json.dumps(product.variant_narxlari or [])
+    razmer_json = json.dumps(product.razmer_matritsa or {})
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            """
+            INSERT INTO products (
+                name, price, discount, category, description, image_url, images,
+                rating, sold_count, discount_type, discount_expires, auto_delete,
+                active, in_stock, variantlar_yoqilgan, variant_nomlari, variant_narxlari, razmer_matritsa, added_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?, ?, ?)
+            """,
+            (
+                product.name, product.price, product.discount, product.category, product.description,
+                product.image_url, images_json, product.rating, product.sold_count, product.discount_type,
+                product.discount_expires, 1 if product.auto_delete else 0,
+                1 if product.variantlar_yoqilgan else 0, var_nom_json, var_narx_json, razmer_json,
+                str(user.get("telegram_id", ""))
+            )
+        )
+        new_id = cur.lastrowid
+        await db.commit()
+
     discount_txt = f" (-{product.discount}%)" if product.discount else ""
     await notify(
-        f"📦 <b>Yangi tovar</b>\n\n"
+        f"📦 <b>Yangi tovar #{new_id}</b>\n\n"
         f"👤 {user['name']}\n"
         f"📌 {product.name}\n"
         f"💰 {product.price:,} so'm{discount_txt}\n"
         f"📂 {product.category}"
     )
 
-    sheets_payload = {
-        "name":             product.name,
-        "description":      product.description,
-        "price":            product.price,
-        "image_url":        product.image_url,
-        "images":           product.images,
-        "category":         product.category,
-        "discount":         product.discount,
-        "rating":           product.rating,
-        "sold_count":       product.sold_count,
-        "added_by":         str(user["telegram_id"]),
-        "added_by_name":    user["name"],
-        "discount_type":    product.discount_type,
-        "discount_expires": product.discount_expires,
-        "auto_delete":      product.auto_delete,
-        "variantlar_yoqilgan": product.variantlar_yoqilgan,
-        "variant_nomlari":     product.variant_nomlari,
-        "variant_narxlari":    product.variant_narxlari,
-        "razmer_matritsa":     product.razmer_matritsa or {},
-    }
+    return {"ok": True, "id": new_id, "message": "Tovar muvaffaqiyatli saqlandi"}
 
     is_temporary = (product.discount > 0 and product.discount_type == "vaqtinchalik")
 

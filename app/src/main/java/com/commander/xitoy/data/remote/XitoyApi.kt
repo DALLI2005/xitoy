@@ -6,8 +6,8 @@ import com.commander.xitoy.domain.model.Product
 
 interface XitoyApi {
 
-    // Google Apps Script dan barcha tovarlarni olish
+    // Backend serverdan barcha tovarlarni olish
     // t parametri har so'rovda kesh bypass qilish uchun
-    @GET("exec")
+    @GET("api/products")
     suspend fun getProducts(@Query("t") timestamp: Long): List<Product>
 }

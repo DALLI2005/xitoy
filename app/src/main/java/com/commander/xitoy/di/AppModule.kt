@@ -47,15 +47,13 @@ object AppModule {
     @Provides
     @Singleton
     fun provideXitoyApi(): XitoyApi {
-        val APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwYNusH54O3kyMAVcdkzpOaBiejRLrvj6EcXtfgh1m37aG79ZiUYRG_OcOEUa3GSkFi8A/"
-
         val okHttpClient = OkHttpClient.Builder()
             .followRedirects(true)
             .followSslRedirects(true)
             .build()
 
         return Retrofit.Builder()
-            .baseUrl(APPS_SCRIPT_URL)
+            .baseUrl("https://admin.eliboyev.uz/")
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
