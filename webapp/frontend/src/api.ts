@@ -3,14 +3,20 @@ import { getInitData } from './telegram'
 const BASE = '/api'
 
 function headers(): HeadersInit {
+  const token = localStorage.getItem('admin_token') || ''
   return {
     'Content-Type': 'application/json',
+    'x-admin-token': token,
     'x-init-data': getInitData(),
   }
 }
 
 function authHeaders(): HeadersInit {
-  return { 'x-init-data': getInitData() }
+  const token = localStorage.getItem('admin_token') || ''
+  return {
+    'x-admin-token': token,
+    'x-init-data': getInitData(),
+  }
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -23,6 +29,21 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  adminLogin: async (data: { telegram_id?: string | number; passcode?: string }) => {
+    const res = await request<{ token: string; user: import('./types').User }>('/auth/admin-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    if (res.token) {
+      localStorage.setItem('admin_token', res.token)
+    }
+    return res
+  },
+
+  logout: () => {
+    localStorage.removeItem('admin_token')
+  },
   me: () => request<import('./types').User>('/me', { headers: headers() }),
 
   categories: () => request<string[]>('/categories', { headers: headers() }),
