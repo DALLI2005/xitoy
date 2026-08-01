@@ -1,7 +1,6 @@
 package com.commander.xitoy.ui.theme
 
 import android.app.Activity
-import android.graphics.Color
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
@@ -46,10 +45,8 @@ fun XitoyTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            // Zamonaviy usul: WindowCompat orqali status/nav bar rangini boshqarish
+            // Edge-to-edge: status va navigation bar shaffof bo'ladi
             WindowCompat.setDecorFitsSystemWindows(window, false)
-            window.statusBarColor = Color.TRANSPARENT
-            window.navigationBarColor = Color.TRANSPARENT
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = true
             WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = true
         }

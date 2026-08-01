@@ -152,6 +152,7 @@ class LoginViewModel @Inject constructor(
         }
     }
 
+    @Suppress("DEPRECATION")
     private fun registerFcmToken(userId: String) {
         if (userId.isEmpty()) return
         viewModelScope.launch(Dispatchers.IO) {

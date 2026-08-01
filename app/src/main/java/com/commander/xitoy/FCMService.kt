@@ -24,7 +24,7 @@ class FCMService : FirebaseMessagingService() {
 
     @Inject lateinit var authApi: AuthApi
 
-    @Suppress("OVERRIDE_DEPRECATION")
+    @Suppress("OVERRIDE_DEPRECATION", "DEPRECATION")
     override fun onNewToken(token: String) {
         super.onNewToken(token)
         val telegramId = SessionManager.session.value?.telegramId ?: return
