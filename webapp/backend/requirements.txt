@@ -6,5 +6,5 @@ python-dotenv>=1.0
 firebase-admin>=6.5.0
 apscheduler>=3.10.0
 # login_bot.py uchun
-python-telegram-bot==20.7
+python-telegram-bot>=21.0
 requests>=2.31
