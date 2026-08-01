@@ -52,7 +52,7 @@ from telegram.ext import (
 
 import login_state
 
-LOGIN_BOT_TOKEN = os.getenv("LOGIN_BOT_TOKEN")
+LOGIN_BOT_TOKEN = os.getenv("LOGIN_BOT_TOKEN") or os.getenv("BOT_TOKEN")
 APPS_SCRIPT_URL = os.getenv(
     "APPS_SCRIPT_URL",
     "https://script.google.com/macros/s/AKfycbwYNusH54O3kyMAVcdkzpOaBiejRLrvj6EcXtfgh1m37aG79ZiUYRG_OcOEUa3GSkFi8A/exec",
