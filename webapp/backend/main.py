@@ -56,9 +56,9 @@ PAYMENT_CARD_NUMBER  = os.environ.get("PAYMENT_CARD_NUMBER", "")
 PAYMENT_CARD_HOLDER  = os.environ.get("PAYMENT_CARD_HOLDER", "")
 APPS_SCRIPT_URL      = os.environ.get("APPS_SCRIPT_URL", "")
 IMGBB_API_KEY        = os.environ.get("IMGBB_API_KEY", "")
-UPLOADS_DIR          = Path("/opt/xitoy_webapp/uploads")
-SITE_BASE_URL        = "https://admin.eliboyev.uz"
-DB_PATH         = "admins.db"
+UPLOADS_DIR          = Path(os.environ.get("UPLOADS_DIR", "/opt/xitoy_webapp/uploads"))
+SITE_BASE_URL        = os.environ.get("SITE_BASE_URL", "https://admin.eliboyev.uz")
+DB_PATH              = os.environ.get("DB_PATH", "admins.db")
 
 # Login bot username (@ siz). Deep-link uchun.
 LOGIN_BOT_USERNAME = os.environ.get("LOGIN_BOT_USERNAME", "dalli_login_robot")
@@ -337,6 +337,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Rasm fayllarini statik serve qilish ────────────────────────────────────────
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
 
 # ── Telegram login (mijoz ilovasi uchun) ────────────────────────────────────────

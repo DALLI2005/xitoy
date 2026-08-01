@@ -5,7 +5,12 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api': 'http://localhost:8000',
+      '/api':     'http://localhost:8000',
+      '/auth':    'http://localhost:8000',
+      '/order':   'http://localhost:8000',
+      '/cart':    'http://localhost:8000',
+      '/uploads': 'http://localhost:8000',
+      '/open':    'http://localhost:8000',
     },
   },
   build: {
