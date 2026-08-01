@@ -22,9 +22,16 @@ from zoneinfo import ZoneInfo
 
 import random
 
-import firebase_admin
-from firebase_admin import credentials as _fcm_creds
-from firebase_admin import messaging as _fcm_messaging
+try:
+    import firebase_admin
+    from firebase_admin import credentials as _fcm_creds
+    from firebase_admin import messaging as _fcm_messaging
+    _HAS_FIREBASE = True
+except ImportError:
+    firebase_admin = None
+    _fcm_creds = None
+    _fcm_messaging = None
+    _HAS_FIREBASE = False
 
 _UZB_TZ          = ZoneInfo("Asia/Tashkent")
 pending_products: list[dict] = []   # vaqtinchalik chegirmali tovarlar, hali e'lon qilinmagan
@@ -92,13 +99,15 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 # ── FCM (Firebase Cloud Messaging) ─────────────────────────────────────────────
 _FCM_CERT_PATH = "/opt/xitoy_webapp/backend/firebase-service-account.json"
 _FCM_ENABLED   = False
-if os.path.exists(_FCM_CERT_PATH):
+if _HAS_FIREBASE and os.path.exists(_FCM_CERT_PATH):
     try:
         firebase_admin.initialize_app(_fcm_creds.Certificate(_FCM_CERT_PATH))
         _FCM_ENABLED = True
         log.info("Firebase Admin SDK tayyor")
     except Exception as _fcm_init_err:
         log.warning("Firebase init xato: %s", _fcm_init_err)
+elif not _HAS_FIREBASE:
+    log.info("firebase_admin kutubxonasi o'rnatilmagan — FCM push o'chirildi")
 else:
     log.warning("Firebase sertifikat topilmadi: %s", _FCM_CERT_PATH)
 
