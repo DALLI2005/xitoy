@@ -67,7 +67,8 @@ fun SplashScreen(navController: NavController) {
         delay(1200)
 
         val destination = when {
-            OnboardingManager.hasCompletedOnboardingOnce(context) -> "main_screen"
+            SessionManager.isLoggedIn -> "main_screen"
+            OnboardingManager.hasCompletedOnboardingOnce(context) -> "login"
             else -> "onboarding"
         }
         navController.navigate(destination) {

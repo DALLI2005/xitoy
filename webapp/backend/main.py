@@ -34,7 +34,6 @@ except ImportError:
     _HAS_FIREBASE = False
 
 _UZB_TZ          = ZoneInfo("Asia/Tashkent")
-pending_products: list[dict] = []   # vaqtinchalik chegirmali tovarlar, hali e'lon qilinmagan
 
 import aiosqlite
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -53,8 +52,6 @@ try:
     load_dotenv()
 except ImportError:
     pass
-
-import login_state
 
 BOT_TOKEN            = os.environ.get("BOT_TOKEN", "")
 SUPERADMIN_ID        = int(os.environ.get("SUPERADMIN_ID", "0"))
@@ -82,9 +79,6 @@ def fix_image_url(url: str) -> str:
             return url.replace(old, SITE_BASE_URL, 1)
     return url
 
-
-# Login bot username (@ siz). Deep-link uchun.
-LOGIN_BOT_USERNAME = os.environ.get("LOGIN_BOT_USERNAME", "dalli_login_robot")
 
 CATEGORIES = [
     "Texnika va elektronika", "Yozgi kolleksiya", "Mebel", "Turizm, baliq ovi va ovchilik",
@@ -378,9 +372,14 @@ async def init_db():
                 variant_narxlari     TEXT DEFAULT '[]',
                 razmer_matritsa      TEXT DEFAULT '{}',
                 added_by             TEXT DEFAULT '',
+                telegram_message_id  INTEGER DEFAULT 0,
                 created_at           TEXT DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        try:
+            await db.execute("ALTER TABLE products ADD COLUMN telegram_message_id INTEGER DEFAULT 0")
+        except aiosqlite.OperationalError:
+            pass
         # Superadmin — barcha kategoriyalar
         await db.execute("""
             INSERT OR IGNORE INTO admins (telegram_id, name, categories)
@@ -395,6 +394,7 @@ async def lifespan(app: FastAPI):
     await init_db()
     scheduler = AsyncIOScheduler(timezone=str(_UZB_TZ))
     scheduler.add_job(check_cart_reminders, "interval", minutes=30, id="cart_reminder")
+    scheduler.add_job(check_temporary_discounts, "interval", minutes=5, id="discount_checker")
     scheduler.start()
     yield
     scheduler.shutdown(wait=False)
@@ -412,15 +412,6 @@ app.add_middleware(
 # ── Rasm fayllarini statik serve qilish ────────────────────────────────────────
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
-
-
-# ── Telegram login (mijoz ilovasi uchun) ────────────────────────────────────────
-@app.get("/auth/start")
-async def auth_start():
-    """Ilova login boshlaydi — login_token va bot havolasini qaytaradi."""
-    login_token = secrets.token_urlsafe(16)
-    deep_link = f"https://t.me/{LOGIN_BOT_USERNAME}?start={login_token}"
-    return {"login_token": login_token, "telegram_url": deep_link}
 
 
 class FcmTokenIn(BaseModel):
@@ -477,24 +468,6 @@ async def cart_cancel_reminder(data: CartCancelIn):
         "telegram_id": data.telegram_id,
     })
     return {"status": "success"}
-
-
-@app.get("/auth/check")
-async def auth_check(login_token: str):
-    """Ilova har 2 soniyada tekshiradi — tasdiqlandimi?"""
-    status = login_state.get(login_token)
-    if status and status.get("tasdiqlandi"):
-        return {
-            "status": "confirmed",
-            "telegram_id": status["telegram_id"],
-            "ism": status["ism"],
-            "username": status["username"],
-            "fullname": status.get("fullname", ""),
-            "phone": status.get("phone", ""),
-            "address": status.get("address", ""),
-            "location_link": status.get("address", ""),
-        }
-    return {"status": "pending"}
 
 
 # ── Telefon + parol auth (mijoz ilovasi, SMS'siz) ──────────────────────────────
@@ -1183,20 +1156,6 @@ async def channel_post(
     return last_msg_id
 
 
-async def wait_until_next_5min():
-    """Keyingi 5 ga bo'linadigan daqiqagacha kutadi: :00, :05, :10, :15..."""
-    now            = datetime.now(_UZB_TZ)
-    current_minute = now.minute
-    current_second = now.second
-    next_minute    = ((current_minute // 5) + 1) * 5
-    if next_minute >= 60:
-        wait_seconds = (60 - current_minute) * 60 - current_second
-    else:
-        wait_seconds = (next_minute - current_minute) * 60 - current_second
-    if wait_seconds > 0:
-        await asyncio.sleep(wait_seconds)
-
-
 async def _broadcast_discount_task(product_id, name: str, discount: int):
     pid_str = str(product_id) if product_id else ""
     log.info("Broadcast boshlandi: mahsulot=%s product_id=%s", name, pid_str or "YO'Q")
@@ -1220,67 +1179,76 @@ async def _channel_post_task(
     product_id, image_url: str, name: str, category: str,
     price: int, discount: int, discount_type: str, discount_expires: str,
 ):
-    """Background task: kanalga post yuboradi va message_id ni Sheets ga saqlaydi."""
+    """Background task: kanalga post yuboradi va message_id ni bazaga saqlaydi."""
     msg_id = await channel_post(
         image_url, name, category, price,
         discount, discount_type, discount_expires, product_id
     )
     if msg_id and product_id is not None:
         try:
-            await sheets_post({
-                "type":       "updateMessageId",
-                "id":         product_id,
-                "message_id": msg_id,
-            })
+            async with aiosqlite.connect(DB_PATH) as db:
+                await db.execute(
+                    "UPDATE products SET telegram_message_id = ? WHERE id = ?",
+                    (msg_id, product_id),
+                )
+                await db.commit()
         except Exception as e:
             log.warning("telegram_message_id saqlashda xatolik: %s", e)
 
 
-def _seconds_until_next_5min() -> int:
-    """Keyingi 5 ga bo'linadigan daqiqagacha soniyalar: :00, :05, :10..."""
-    now            = datetime.now(_UZB_TZ)
-    current_minute = now.minute
-    current_second = now.second
-    next_minute    = ((current_minute // 5) + 1) * 5
-    if next_minute >= 60:
-        return (60 - current_minute) * 60 - current_second
-    return (next_minute - current_minute) * 60 - current_second
+async def check_temporary_discounts():
+    """Har 5 daqiqada muddati o'tgan vaqtinchalik chegirmalarni tekshiradi:
+    auto_delete=1 bo'lsa mahsulot va kanal posti o'chiriladi, aks holda chegirma 0 ga tushiriladi."""
+    now = datetime.now(_UZB_TZ)
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT id, name, discount, auto_delete, discount_expires, telegram_message_id "
+            "FROM products WHERE discount_type = 'vaqtinchalik' AND discount > 0 AND discount_expires != ''"
+        )
+        rows = await cur.fetchall()
 
-
-async def _publish_at_5min(sheets_payload: dict, image_url: str, name: str,
-                           category: str, price: int, discount: int,
-                           discount_type: str, discount_expires: str,
-                           wait_seconds: int, send_push: bool = False):
-    """Belgilangan vaqt kutib, ham Sheets ga (ilova), ham kanalga bir vaqtda joylashtiradi."""
-    await asyncio.sleep(wait_seconds)
-
-    result     = await sheets_post(sheets_payload)
-    product_id = result.get("id") if isinstance(result, dict) else None
-
-    await _channel_post_task(
-        product_id, image_url, name, category,
-        price, discount, discount_type, discount_expires,
-    )
-
-    pending_products[:] = [p for p in pending_products if p.get("name") != name]
-
-    if send_push and discount > 0:
-        log.info("Vaqtinchalik mahsulot chiqarildi, broadcast boshlanmoqda: %s (%s%%)", name, discount)
-        template = get_discount_message(discount)
-        users    = await get_all_users_with_fcm_token()
-        sent     = 0
-        for user in users:
+        for row in rows:
             try:
-                fullname = user.get("fullname", "") or ""
-                ism  = fullname.split()[0] if fullname.strip() else "Mijoz"
-                text = template.format(ism=ism, mahsulot=name, foiz=discount)
-                pid_str = str(product_id) if product_id else ""
-                data = {"type": "product", "product_id": pid_str} if pid_str else {"type": "general"}
-                await send_push_notification(user["fcm_token"], "Dalli Shop", text, data)
-                sent += 1
+                s = row["discount_expires"].strip().replace("Z", "+00:00")
+                expires_dt = datetime.fromisoformat(s)
+                if expires_dt.tzinfo is None:
+                    expires_dt = expires_dt.replace(tzinfo=_UZB_TZ)
             except Exception as e:
-                log.warning("Broadcast (pending) FCM xato (%s): %s", user.get("telegram_id"), e)
-        log.info("Broadcast tugadi: %d ta push yuborildi (%s)", sent, name)
+                log.warning("check_temporary_discounts: id=%s sanani parse qilib bo'lmadi: %s", row["id"], e)
+                continue
+
+            if now <= expires_dt:
+                continue
+
+            if row["auto_delete"]:
+                if row["telegram_message_id"]:
+                    cur2 = await db.execute("SELECT channel_id FROM channels WHERE enabled = 1")
+                    channels = await cur2.fetchall()
+                    for ch in channels:
+                        await asyncio.to_thread(
+                            _tg_delete_channel_message, ch["channel_id"], row["telegram_message_id"]
+                        )
+                await db.execute("DELETE FROM products WHERE id = ?", (row["id"],))
+                await db.commit()
+                await notify(f"🗑️ <b>{_html.escape(row['name'])}</b> avtomatik o'chirildi (chegirma tugadi)")
+                log.info("check_temporary_discounts: id=%s o'chirildi (auto_delete)", row["id"])
+            else:
+                await db.execute("UPDATE products SET discount = 0 WHERE id = ?", (row["id"],))
+                await db.commit()
+                log.info("check_temporary_discounts: id=%s chegirma 0 ga tushirildi", row["id"])
+
+
+def _tg_delete_channel_message(channel_id: str, message_id: int):
+    try:
+        req = urllib.request.Request(
+            f"https://api.telegram.org/bot{BOT_TOKEN}/deleteMessage",
+            data=json.dumps({"chat_id": channel_id, "message_id": message_id}).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        urllib.request.urlopen(req, timeout=10)
+    except Exception as e:
+        log.warning("Kanal postini o'chirishda xatolik (%s, msg=%s): %s", channel_id, message_id, e)
 
 
 # ── /api/me ────────────────────────────────────────────────────────────────────
@@ -1464,39 +1432,18 @@ async def add_product(product: ProductIn, user: dict = Depends(get_current_user)
         f"📂 {product.category}"
     )
 
-    return {"ok": True, "id": new_id, "message": "Tovar muvaffaqiyatli saqlandi"}
-
-    is_temporary = (product.discount > 0 and product.discount_type == "vaqtinchalik")
-
-    if is_temporary:
-        wait_seconds = _seconds_until_next_5min()
-        pending_products.append({"name": product.name, "wait_seconds": wait_seconds})
-        asyncio.create_task(_publish_at_5min(
-            sheets_payload, product.image_url, product.name, product.category,
-            product.price, product.discount, product.discount_type,
-            product.discount_expires, wait_seconds, send_push=product.send_push,
-        ))
-        mins, secs = divmod(wait_seconds, 60)
-        return {
-            "status":       "pending",
-            "message":      f"Tovar {mins} daqiqa {secs} soniyadan so'ng joylashadi",
-            "wait_seconds": wait_seconds,
-        }
-
-    result     = await sheets_post(sheets_payload)
-    product_id = result.get("id") if isinstance(result, dict) else None
     asyncio.create_task(_channel_post_task(
-        product_id, product.image_url, product.name, product.category,
+        new_id, product.image_url, product.name, product.category,
         product.price, product.discount, product.discount_type, product.discount_expires,
     ))
 
     if product.send_push and product.discount > 0:
-        log.info("Doimiy mahsulot saqlandi, broadcast boshlanmoqda: %s (%s%%)", product.name, product.discount)
+        log.info("Mahsulot saqlandi, broadcast boshlanmoqda: %s (%s%%)", product.name, product.discount)
         asyncio.create_task(_broadcast_discount_task(
-            product_id, product.name, product.discount
+            new_id, product.name, product.discount
         ))
 
-    return result
+    return {"ok": True, "id": new_id, "message": "Tovar muvaffaqiyatli saqlandi"}
 
 
 # ── /api/upload ────────────────────────────────────────────────────────────────

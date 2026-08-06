@@ -15,8 +15,6 @@ echo "=== 2. Fayllarni serverga ko'chirish ==="
 ssh $SERVER "mkdir -p /opt/xitoy_webapp/backend /opt/xitoy_webapp/frontend"
 scp -r frontend/dist              $SERVER:/opt/xitoy_webapp/frontend/
 scp    backend/main.py            $SERVER:/opt/xitoy_webapp/backend/
-scp    backend/login_bot.py       $SERVER:/opt/xitoy_webapp/backend/
-scp    backend/login_state.py     $SERVER:/opt/xitoy_webapp/backend/
 scp    backend/requirements.txt   $SERVER:/opt/xitoy_webapp/backend/
 # Eslatma: .env serverda qo'lda boshqariladi (LOGIN_BOT_TOKEN ni o'sha yerda to'ldiring).
 # Birinchi marta:  scp backend/.env.example $SERVER:/opt/xitoy_webapp/backend/.env
@@ -53,22 +51,19 @@ ssh $SERVER "DOMAIN=$DOMAIN" << 'REMOTE'
   echo "SSL tayyor"
 REMOTE
 
-echo "=== 6. FastAPI + Login bot systemd service ==="
+echo "=== 6. FastAPI systemd service ==="
 scp xitoy_webapp.service   $SERVER:/etc/systemd/system/
-scp dalli_login_bot.service $SERVER:/etc/systemd/system/
 
 ssh $SERVER << 'REMOTE'
   systemctl daemon-reload
-  systemctl enable xitoy_webapp dalli_login_bot
-  systemctl restart xitoy_webapp dalli_login_bot
+  systemctl enable xitoy_webapp
+  systemctl restart xitoy_webapp
   sleep 2
   systemctl status xitoy_webapp --no-pager
-  systemctl status dalli_login_bot --no-pager
 REMOTE
 
 echo ""
-echo "✅ WebApp + Login bot ishga tushdi!"
+echo "✅ WebApp ishga tushdi!"
 echo ""
 echo "URL:        https://admin.eliboyev.uz"
 echo "WebApp log: ssh $SERVER 'journalctl -u xitoy_webapp -f'"
-echo "Bot log:    ssh $SERVER 'journalctl -u dalli_login_bot -f'"
