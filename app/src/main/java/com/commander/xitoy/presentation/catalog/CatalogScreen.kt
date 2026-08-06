@@ -27,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,9 +52,7 @@ import com.commander.xitoy.ui.theme.DalliSurface
 import com.commander.xitoy.ui.theme.DalliText
 import com.commander.xitoy.ui.theme.DalliTextSecondary
 
-private val CHIP_CATEGORIES = listOf(
-    "Hammasi", "Elektronika", "Kiyim", "Poyabzal", "Aksessuar", "Sport", "Uy uchun"
-)
+private const val ALL_CATEGORIES = "Hammasi"
 
 private val SORT_OPTIONS = listOf(
     "hot" to "Ommabop",
@@ -72,12 +71,38 @@ fun CatalogScreen(
     val errorMessage by viewModel.errorMessage.collectAsState()
     val favorites = FavoritesManager.favorites.collectAsState().value
 
-    var selectedCategory by remember { mutableStateOf("Hammasi") }
+    var selectedCategory by remember { mutableStateOf(ALL_CATEGORIES) }
+    var selectedSubcategory by remember { mutableStateOf<String?>(null) }
     var sort by remember { mutableStateOf("hot") }
 
-    val visibleProducts = remember(products, selectedCategory, sort) {
-        val byCat = if (selectedCategory == "Hammasi") products
+    // Chiplar mahsulotlardagi haqiqiy toifalardan quriladi — qo'lda yozilgan
+    // ro'yxat backenddagi kategoriyalarga mos kelmasdi va chiplar bo'sh chiqardi.
+    val chipCategories = remember(products) {
+        listOf(ALL_CATEGORIES) + products.map { it.category }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .sorted()
+    }
+
+    // Tanlangan asosiy toifa ichidagi kichik toifalar
+    val subcategories = remember(products, selectedCategory) {
+        if (selectedCategory == ALL_CATEGORIES) emptyList()
+        else products.filter { it.category == selectedCategory }
+            .map { it.subcategory }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .sorted()
+    }
+
+    // Asosiy toifa almashsa, eskirgan kichik toifa tanlovini tashlaymiz
+    LaunchedEffect(selectedCategory) { selectedSubcategory = null }
+
+    val visibleProducts = remember(products, selectedCategory, selectedSubcategory, sort) {
+        var byCat = if (selectedCategory == ALL_CATEGORIES) products
         else products.filter { it.category.equals(selectedCategory, ignoreCase = true) }
+        selectedSubcategory?.let { sub ->
+            byCat = byCat.filter { it.subcategory.equals(sub, ignoreCase = true) }
+        }
         when (sort) {
             "hot" -> byCat.sortedByDescending { it.soldCount }
             "margin" -> byCat.sortedByDescending { it.discountPercent }
@@ -132,9 +157,19 @@ fun CatalogScreen(
                                 color = DalliText
                             )
                             CatalogCategoryChips(
+                                categories = chipCategories,
                                 selected = selectedCategory,
                                 onSelect = { selectedCategory = it }
                             )
+                            if (subcategories.isNotEmpty()) {
+                                CatalogSubcategoryChips(
+                                    subcategories = subcategories,
+                                    selected = selectedSubcategory,
+                                    onSelect = { sub ->
+                                        selectedSubcategory = if (selectedSubcategory == sub) null else sub
+                                    }
+                                )
+                            }
                             CatalogSortRow(
                                 count = visibleProducts.size,
                                 sort = sort,
@@ -159,14 +194,18 @@ fun CatalogScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CatalogCategoryChips(selected: String, onSelect: (String) -> Unit) {
+private fun CatalogCategoryChips(
+    categories: List<String>,
+    selected: String,
+    onSelect: (String) -> Unit
+) {
     Row(
         modifier = Modifier
             .horizontalScroll(rememberScrollState())
             .padding(vertical = 2.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        CHIP_CATEGORIES.forEach { cat ->
+        categories.forEach { cat ->
             val isSelected = selected.equals(cat, ignoreCase = true)
             Card(
                 onClick = { onSelect(cat) },
@@ -183,6 +222,43 @@ private fun CatalogCategoryChips(selected: String, onSelect: (String) -> Unit) {
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
                     color = if (isSelected) Color.White else DalliTextSecondary
+                )
+            }
+        }
+    }
+}
+
+/** 2-daraja: tanlangan asosiy toifa ichidagi kichik toifalar. Qayta bosilsa — bekor qilinadi. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CatalogSubcategoryChips(
+    subcategories: List<String>,
+    selected: String?,
+    onSelect: (String) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .horizontalScroll(rememberScrollState())
+            .padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        subcategories.forEach { sub ->
+            val isSelected = selected == sub
+            Card(
+                onClick = { onSelect(sub) },
+                shape = RoundedCornerShape(999.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isSelected) DalliPrimarySoft else DalliSurface
+                ),
+                border = BorderStroke(1.dp, if (isSelected) DalliPrimary else DalliLine),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Text(
+                    text = sub,
+                    modifier = Modifier.padding(horizontal = 13.dp, vertical = 7.dp),
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 12.sp,
+                    color = if (isSelected) DalliPrimary else DalliTextSecondary
                 )
             }
         }

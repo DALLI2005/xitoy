@@ -6,160 +6,13 @@ import {
 } from 'lucide-react'
 import { api } from '../api'
 import { hapticSuccess, hapticError } from '../telegram'
-import type { User } from '../types'
+import type { User, CategoryTree } from '../types'
 
 interface Props { user: User }
 
 // ─── Kategoriya daraxti ──────────────────────────────────────────────────────
-type CategoryTree = Record<string, Record<string, string[]>>
-
-const CATEGORY_TREE: CategoryTree = {
-  "Texnika va elektronika": {
-    "Smartfonlar va gadjetlar": ["Smartfonlar", "Smart soatlar", "Quloqchinlar"],
-    "Noutbuklar va kompyuterlar": ["Noutbuklar", "Kompyuter qismlari", "Aksessuarlar"],
-    "Televizorlar va audio": ["Televizorlar", "Uy kinoteatri", "Akustika"]
-  },
-  "Yozgi kolleksiya": {
-    "Kiyimlar": ["Futbolkalar", "Shortilar", "Ko'ylaklar"],
-    "Poyabzallar": ["Shlyopkalar", "Sandallar", "Krossovkalar"],
-    "Aksessuarlar": ["Quyosh ko'zoynaklari", "Shlyapalar", "Sumkalar"]
-  },
-  "Mebel": {
-    "Karavot va matraslar": ["Matraslar", "Karavotlar", "Yotoqxona uchun mebel to'plamlari"],
-    "Oshxona mebellari": ["Oshxona burchaklari", "Oshxona garniturasi", "Oshxona modullari", "Oshxona xontaxtalari"],
-    "Vannaxona uchun mebel": ["Rakovina uchun tumbalar", "Vannaxona uchun mebel to'plamlari", "Vannaxona uchun shkaflar", "Vannaxona uchun penallar", "Kir yuvish mashinasi uchun mebel"],
-    "Mebel uchun furnitura va butlovchi qismlar": ["Mebel to'ldirgichlari", "Mebel uchun butlovchi qismlar", "Mebel uchun furnitura"],
-    "Saqlash mebellari": ["Komodlar va tumbalar", "Tokcha va javonlar", "Qavatli ilgichlar", "Shkaflar va garideroblar"],
-    "Yumshoq mebel": ["Pufiklar va banketkalar", "Divanlar", "Kreslolar", "Yumshoq mebel to'plamlari"],
-    "Ofis va kompyuter mebellari": ["Ofis kreslolari", "Geymerlar uchun kreslolari", "Seyflar", "Partalar", "Ofis mebeli to'plamlari", "Ofis tumbalari", "Yozuv va kompyuter stollari"],
-    "Stollar va stullar": ["Stullar", "Jurnal stollari", "Stollar", "Ovqatlanish guruhlari", "Pardoz stollari va konsollar", "Taburetkalar"]
-  },
-  "Turizm, baliq ovi va ovchilik": {
-    "Kemping": ["Chodirlar", "Tentlar va chodirlar", "Aksessuarlar chodirlar va tentlar uchun"],
-    "Taktik kiyim": ["Taktik kostyumlar", "Taktik aksessuarlar", "Taktik poyabzal", "Taktik qo'lqoplar", "Taktik kurtkalar", "Taktik ryukzaklar", "Taktik shim"],
-    "Baliq ovi": ["G'altaklar baliq ovlash uchun", "Baliq ovlash asboblari va aksessuarlari", "Baliq ovi uchun primankalar va o'ljalar", "Qayiqlar va aksessuarlar", "Ozuqalar, nasadkalar, baliq ovlash uchun...", "Leskalar va simlar", "Ilgaklar, bog'ichlar va gruzilalar", "Exolotlar va navigatsiya"],
-    "Turizm va ochiq havoda dam olish": ["Fonarlar va aksessuarlar", "Turizm va dam olish uchun aksessuarlar", "Sayohat uchun ryukzaklar va sumkalar", "Katlanadigan sayyohlik stullari", "Sayohat uchun idishlar", "Sayyohlik stollari va mebel to'plamlari", "Metall izlagichlar va aksessuarlar", "Uyqu qoplari", "Turistik gilamchalar", "Nasoslar", "Orientatsiya uchun yordamchi vositalar", "Osma qozonchalar va gulhan uchun uch..."],
-    "Ov va otish mashg'ulotlari": ["Cho'zmalar", "Optika va diqqatga sazovor joylar", "Sport otish mashqlari", "Trofeylar uchun bezaklar"]
-  },
-  "Elektronika": {
-    "Smartfonlar va telefonlar": ["Smartfonlar uchun aksessuarlar", "Knopkali telefonlar", "Smartfonlar", "Ehtiyot qismlar va ta'mirlash", "Statsionar telefonlar"],
-    "Kompyuter texnikasi": ["Kompyuter aksessuarlari", "Kompyuter texnikalari uchun butlovchi qi...", "Kompyuterning tashqi qurilmalari", "Ma'lumotlarni saqlash", "Kompyuterlar", "Dasturiy ta'minot"],
-    "Geymerlar uchun mahsulotlar": ["O'yin pristavkalari", "O'yin sichqonchalari", "O'yin klaviaturalari", "O'yin uchun quloqchinlar", "O'yinlar", "O'yin gilamchalari", "O'yin monitorlari", "O'yin noutbuklari", "O'yin g'ildiraklari va pedallari", "VR-garnituralar"],
-    "Aqlli uy va xavfsizlik": ["Videokuzatuv", "Aqlli uy", "Uy xavfsizligi"],
-    "Optik anjomlar": ["Teleskoplar", "Okulyarlar", "Mikroskoplar", "Teatr binokllari", "Mikroskoplar uchun aksessuarlar", "Smart ko'zoynak", "Teleskop aksessuarlari"],
-    "Noutbuklar, planshetlar va elektron kitoblar": ["Noutbuklar", "Planshetlar va elektron kitoblar", "Noutbuk uchun aksessuarlar"],
-    "Quloqchinlar va audio texnikalar": ["Quloqchinlar", "Audiotexnika", "Proigrivatel uchun aksessuarlar", "Periferiya va aksessuarlar"],
-    "Ofis texnikasi": ["Ofis jihozlari uchun butlovchi qismlar", "Ofis jihozlari", "Aksessuarlar va ofis jihozlari parvarishi"],
-    "Elektronikalar uchun aksessuarlar": ["USB hablar", "Akkumulyatorlar uchun zaryadlovchi quri...", "Tarmoq filtrlari", "Konnektorlar", "Kabel himoyasi", "Uzaytirgichlar", "Akkumulyator batareyalar", "Kabellar uchun tutqichlar", "Tarmoqlagichlar", "Elektr tarmoqiagichlar", "Kabellar uchun organayzerlar", "Dok-stansiyalar", "Quyosh panellari va batareyalari", "Kuchlanishni o'zgartirgichlar", "Simlar uchun qutilar"],
-    "Navigatorlar": ["GPS-trekerlar va GPS-mayoqlar", "Sayyohlik navigatorlari", "Avtomobil navigatorlari", "Elektron kompaslar", "Navigatorlar uchun aksessuarlar"],
-    "Televizorlar va videotexnikalar": ["Kabellar va adapterlar", "Televizorlar", "Tyuner va resiverlar", "Televizor aksessuarlari", "Televizor uchun stend va kronshteynlar", "TV-pristavkalar va media pleerlar", "Proyektorlar va aksessuarlar", "Raqamli va sun'iy yo'ldosh TV", "Ichki joylashadigan televizorlar"],
-    "Aqlli soatlar va fitnes bilaguzuklar": ["Aqlli soatlar", "Qayishlar", "Fitnes bilaguzuklar", "Kabellar va zaryadlovchi qurilmalar", "Aqlli gadjetlar", "Soatlar va fitnes bilaguzuklar uchun him..."],
-    "Foto va video texnika": ["Fotosuratchilar uchun uskunalar", "Foto va video kameralar", "Foto va video kameralar uchun aksessua..."],
-    "Soatlar va elektron budilniklar": ["Elektron budilniklar", "Proyeksiya soatlari", "Radio budilniklar", "Aromabudilniklar va katrijlar"],
-    "Kvadrokopterlar va aksessuarlar": ["Kvadrokopterlar uchun aksessuarlar", "Kvadrokopterlar"]
-  },
-  "Maishiy texnika": {
-    "Katta maishiy texnika": ["Suv uchun kulerlar va aksessuarlar", "Oshxona dudburonlari", "Qaynatish panellari", "Katta maishiy texnika uchun aksessuarlar", "Sovutgichlar va muzlatgichlar", "Kir yuvish mashinalari", "Pechlar", "Pechkalar", "Idish yuvish mashinalari", "Quritgich mashinasi"],
-    "Go'zallik uchun texnika": ["Soch turmaklash", "Soch kesish", "Elektr ustaralar", "Apparatli kosmetologiya", "Epilyatorlar va aksessuarlar", "Yerda turadigan tarozilar", "Mini solariya"],
-    "Uy uchun texnika": ["Changyutgichlar va aksessuarlar", "Dazmollar va bug'lagichlar", "Tikuv mashinalari va aksessuarlari", "Sterilizatorlar", "Namlab tozalash apparatlari", "Qo'l uchun quritgichlar"],
-    "Iqlim texnikasi": ["Ventilyatorlar", "Havoni tozalash va namlantirish", "Isitgichlar", "Konditsionerlar va split tizimlar", "Suv isitgichlari va isitish qozonlari", "Havo sovutgichlari", "Datchiklar", "Ob-havo stansiyalari"],
-    "Oshxona texnikalari": ["Maydalash va aralashtirish", "Qovurish va pishirish uskunalari", "Elektr choynaklar va termopotlar", "Boshqa oshxona texnikalari", "Kofe tayyorlash", "Sharbat chiqargichlar", "Mikroto'lqinli pechlar va aksessuarlar"],
-    "Maishiy texnika uchun boshqa aksessuarlar va ehtiyot qismlar": ["Aksessuarlar", "Ehtiyot qismlar"]
-  },
-  "Kiyim": {
-    "Ayollar kiyimi": ["Ko'ylaklar", "Bluzkalar", "Shimlar va jinsilar"],
-    "Erkaklar kiyimi": ["Futbolkalar", "Ko'ylaklar", "Shimlar"],
-    "Bolalar kiyimi": ["Chaqaloqlar uchun", "Qizlar uchun", "O'g'il bolalar uchun"]
-  },
-  "Poyabzallar": {
-    "Ayollar poyabzali": ["Tuflilar", "Krossovkalar", "Etiklar"],
-    "Erkaklar poyabzali": ["Krossovkalar", "Klassik poyabzal", "Botinkalar"],
-    "Bolalar poyabzali": ["Maktab uchun", "Sport uchun", "Qishki poyabzal"]
-  },
-  "Aksessuarlar": {
-    "Sumkalar va hamyonlar": ["Ayollar sumkalari", "Erkaklar sumkalari", "Hamyonlar"],
-    "Zargarlik buyumlari": ["Uzuklar", "Sirg'alar", "Zanjirlar"],
-    "Soatlar": ["Erkaklar soatlari", "Ayollar soatlari", "Bolalar soatlari"]
-  },
-  "Go'zallik va parvarish": {
-    "Makiyaj": ["Ko'z uchun", "Lab uchun", "Yuz uchun"],
-    "Soch parvarishi": ["Shampunlar", "Konditsionerlar", "Soch uchun niqoblar"],
-    "Parfyumeriya": ["Erkaklar atirlari", "Ayollar atirlari", "Uniseks atirlar"]
-  },
-  "Salomatlik": {
-    "Vitaminlar va BADlar": ["Vitamin komplekslari", "Minerallar", "Sport ozuqalari"],
-    "Tibbiy asboblar": ["Tonometrlar", "Termometrlar", "Inhalyatorlar"],
-    "Ortopediya": ["Bandajlar", "Ortopedik yostiqlar", "Korsetlar"]
-  },
-  "Uy-ro'zg'or buyumlari": {
-    "Idish-tovoq": ["Qozonlar va tavalar", "Pichoqlar", "Choy va qahva uchun"],
-    "To'qimachilik": ["Choyshablar", "Sochiqlar", "Ko'rpalar va yostiqlar"],
-    "Tozalash vositalari": ["Shvabralar", "Chelaklar", "Chiqindi qutilari"]
-  },
-  "Qurilish va ta'mirlash": {
-    "Elektr asboblari": ["Drellar", "Perforatorlar", "Shurupovyortlar"],
-    "Qo'l asboblari": ["Bolg'alar", "Otvyortkalar", "Kalitlar"],
-    "Pardozlash materiallari": ["Gulqog'ozlar", "Bo'yoqlar", "Laminat"]
-  },
-  "Avtotovarlar": {
-    "Avtokimyo va kosmetika": ["Shampunlar", "Polirovkalar", "Moylar"],
-    "Avto ehtiyot qismlari": ["Filtrlar", "Svechalar", "Tormoz kolodkalari"],
-    "Avto aksessuarlar": ["Gilamchalar", "Chexollar", "Tashkilotchilar"]
-  },
-  "Bolalar tovarlari": {
-    "O'yinchoqlar": ["Konstruktorlar", "Qo'g'irchoqlar", "Yumshoq o'yinchoqlar"],
-    "Chaqaloqlar parvarishi": ["Tagliklar", "Soskalar", "Bolalar kosmetikasi"],
-    "Bolalar xonasi": ["Beshiklar", "Manajlar", "Bolalar mebellari"]
-  },
-  "Xobbi va ijod": {
-    "Rasm chizish": ["Bo'yoqlar", "Mo'yqalamlar", "Molbertlar"],
-    "Trikotaj va tikuvchilik": ["Iplar", "Ignalar", "Biserlar"],
-    "Stol o'yinlari": ["Kattalar uchun", "Bolalar uchun", "Boshqotirmalar"]
-  },
-  "Sport va hordiq": {
-    "Fitnes va trenajyorlar": ["Yugurish yo'lakchalari", "Gantellar", "Fitbollar"],
-    "Velosport": ["Velosipedlar", "Samokatlar", "Roliklar"],
-    "Sport kiyimlari va poyabzali": ["Sport kostyumlari", "Krossovkalar", "Futbolkalar"]
-  },
-  "Oziq-ovqat mahsulotlari": {
-    "Choy, qahva, kakao": ["Qora choy", "Ko'k choy", "Qahva donalari"],
-    "Shirinliklar va pishiriqlar": ["Shokolad", "Pechenye", "Marmelad"],
-    "Baqqallik": ["Makaronlar", "Yormalar", "Ziravorlar"]
-  },
-  "Maishiy kimyoviy moddalar": {
-    "Kir yuvish vositalari": ["Kir yuvish kukunlari", "Gellar", "Konditsionerlar"],
-    "Idish yuvish vositalari": ["Gellar", "Tabletkalar", "Gubkalar"],
-    "Uy tozalash": ["Pollar uchun", "Oynalar uchun", "Santexnika uchun"]
-  },
-  "Kanselyariya tovarlari": {
-    "Yozuv asboblari": ["Ruchkalar", "Qalamlar", "Markerlar"],
-    "Qog'oz mahsulotlari": ["Daftarlar", "Bloknotlar", "A4 qog'oz"],
-    "Ofis jihozlari": ["Staplerlar", "Skrepkalar", "Papkalar"]
-  },
-  "Hayvonlar uchun tovarlar": {
-    "Mushuklar uchun": ["Ozuqalar", "Tovoqlar", "O'yinchoqlar"],
-    "Itlar uchun": ["Ozuqalar", "Bog'ichlar", "O'yinchoqlar"],
-    "Qushlar va kemiruvchilar": ["Qafaslar", "Ozuqalar", "Aksessuarlar"]
-  },
-  "Kitoblar": {
-    "Badiiy adabiyot": ["Romanlar", "Detektivlar", "Fantastika"],
-    "Bolalar adabiyoti": ["Ertaklar", "She'rlar", "Ensiklopediyalar"],
-    "O'quv adabiyoti": ["Darsliklar", "Qo'llanmalar", "Lug'atlar"]
-  },
-  "Dacha, bog' va tomorqa": {
-    "Bog' asboblari": ["Kuraklar", "Xaskashlar", "Qaychilar"],
-    "Sug'orish tizimlari": ["Shlanglar", "Purkagichlar", "Nasoslar"],
-    "Bog' mebellari": ["Stollar", "Kreslolar", "Qavatoryerlar"]
-  },
-  "Reabilitatsiya uchun subsidiyalangan mahsulotlar": {
-    "Harakatlanish vositalari": ["Nogironlar aravachalari", "Hassalar", "Xodunoklar"],
-    "Parvarish vositalari": ["Tagliklar", "Gigiyena vositalari", "Maxsus to'shaklar"],
-    "Ko'zi ojizlar uchun": ["Maxsus soatlar", "Tayoqlar", "Ovozli qurilmalar"]
-  },
-  "Boshqa": {
-    "Turli xil": ["Boshqalar", "To'plamlar"]
-  }
-}
+// Daraxt backenddan (`categories.py` — yagona manba) olinadi, shuning uchun
+// sayt / backend / ilova bir xil kategoriyalar bilan ishlaydi.
 
 // ─── Yordamchi funksiyalar ────────────────────────────────────────────────────
 function randInt(min: number, max: number) {
@@ -173,6 +26,16 @@ function makeEmpty() {
     name: '', price: '', discount: '', description: '',
     rating: randomRating(), sold_count: String(randomSold()),
   }
+}
+
+const DESCRIPTION_MAX = 390
+
+// select ning qiymati -> ilovada ko'rsatiladigan nom
+const COUNTRY_LABELS: Record<string, string> = {
+  uzbekistan: "O'zbekiston",
+  russia: 'Rossiya',
+  turkey: 'Turkiya',
+  china: 'Xitoy',
 }
 
 type DiscountType = 'permanent' | 'temporary'
@@ -197,7 +60,10 @@ export default function AddProduct({ user }: Props) {
   const [step, setStep] = useState(1)  // 1 = Kartochka, 2 = Narx, 3 = Razmer/Xususiyat
 
   // Category state (3 daraja)
-  const [cat1, setCat1] = useState('')  // Asosiy kategoriya
+  const [categoryTree, setCategoryTree] = useState<CategoryTree>({})
+  const [treeLoading, setTreeLoading] = useState(true)
+  const [treeError, setTreeError] = useState('')
+  const [cat1, setCat1] = useState('')  // Asosiy kategoriya (ruxsat shu bo'yicha)
   const [cat2, setCat2] = useState('')  // 2-daraja
   const [cat3, setCat3] = useState('')  // 3-daraja
   const [catConfirmed, setCatConfirmed] = useState(false)
@@ -298,10 +164,31 @@ export default function AddProduct({ user }: Props) {
   const toastTimer = useRef<ReturnType<typeof setTimeout>>()
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Kategoriya optionlari
-  const cat1Options = Object.keys(CATEGORY_TREE)
-  const cat2Options = cat1 ? Object.keys(CATEGORY_TREE[cat1] || {}) : []
-  const cat3Options = cat1 && cat2 ? (CATEGORY_TREE[cat1]?.[cat2] || []) : []
+  const descTooLong = form.description.length >= DESCRIPTION_MAX
+
+  // Kategoriya daraxtini backenddan olamiz (yagona manba)
+  useEffect(() => {
+    let cancelled = false
+    api.categoryTree()
+      .then(res => {
+        if (cancelled) return
+        setCategoryTree(res.tree || {})
+        setTreeError('')
+      })
+      .catch(() => {
+        if (!cancelled) setTreeError("Kategoriyalarni yuklab bo'lmadi")
+      })
+      .finally(() => { if (!cancelled) setTreeLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  // Kategoriya optionlari — admin faqat o'ziga ruxsat berilgan asosiy toifalarni ko'radi
+  const allowedRoots = user.is_superadmin
+    ? Object.keys(categoryTree)
+    : Object.keys(categoryTree).filter(r => user.categories.includes(r))
+  const cat1Options = allowedRoots
+  const cat2Options = cat1 ? Object.keys(categoryTree[cat1] || {}) : []
+  const cat3Options = cat1 && cat2 ? (categoryTree[cat1]?.[cat2] || []) : []
 
   // Kategoriya o'zgarganda quyi darajalarni tozalash
   function handleCat1Change(val: string) {
@@ -387,8 +274,6 @@ export default function AddProduct({ user }: Props) {
 
     setLoading(true)
     try {
-      const finalCategory = cat3 || cat2 || cat1
-
       // Variantlarni JSON ga o'girish
       let razmerMatritsa: Record<string, { nomi: string; narx: number }[]> = {}
       if (variantEnabled && variantNames.length > 0) {
@@ -424,6 +309,20 @@ export default function AddProduct({ user }: Props) {
         imageUrls.push(await api.uploadImage(photo))
       }
 
+      // Ishlab chiqarilgan mamlakat — uchta variantdan bittasi
+      const countryFinal = isChina
+        ? 'Xitoy'
+        : noCountry
+          ? ''
+          : (COUNTRY_LABELS[country] || '')
+
+      // Xususiyatlar: faqat qiymati tanlanganlari yuboriladi
+      const attributesFinal: Record<string, string[]> = {}
+      activeAttributes.forEach(attr => {
+        const vals = (selectedAttributes[attr] || []).filter(Boolean)
+        if (vals.length > 0) attributesFinal[attr] = vals
+      })
+
       await api.addProduct({
         name: form.name.trim(),
         price: priceNum,
@@ -431,8 +330,16 @@ export default function AddProduct({ user }: Props) {
         discount_type: discountType,
         discount_expires: discountExpires || undefined,
         auto_delete: autoDelete,
-        category: finalCategory,
+        // Uchala daraja alohida yuboriladi: ruxsat cat1 (asosiy toifa) bo'yicha
+        // tekshiriladi, cat2/cat3 esa tovar bilan birga saqlanadi.
+        category: cat1,
+        subcategory: cat2,
+        product_type: cat3,
         description: form.description.trim(),
+        // Ilovadagi tovar kartochkasida ko'rsatiladigan qo'shimcha ma'lumotlar
+        country: countryFinal,
+        guarantee_months: parseInt(guarantee) || 0,
+        attributes: attributesFinal,
         image_url: imageUrls[0] || '',
         images: imageUrls,
         rating: parseFloat(form.rating) || 4.2,
@@ -454,6 +361,8 @@ export default function AddProduct({ user }: Props) {
       setVariantEnabled(false); setVariantNames([]); setVariantPrices([])
       setSizesByColor({}); setDiscountType('permanent')
       setSelectedDuration(null); setCustomMinutes('')
+      setCountry(''); setNoCountry(false); setIsChina(true); setGuarantee('')
+      setActiveAttributes([]); setSelectedAttributes({})
     } catch (err: any) {
       hapticError?.()
       showToast('error', err?.message || "Xato yuz berdi")
@@ -498,15 +407,30 @@ export default function AddProduct({ user }: Props) {
               <a className="ap-link" href="#">Yo'riqnomada batafsil</a>
             </div>
 
+            {/* Kategoriyalar yuklanmasa / ruxsat bo'lmasa — aniq xabar */}
+            {treeError && (
+              <div className="ap-info-box" style={{ color: '#B91C1C', background: '#FEE2E2' }}>
+                {treeError}. Sahifani yangilab ko'ring.
+              </div>
+            )}
+            {!treeLoading && !treeError && cat1Options.length === 0 && (
+              <div className="ap-info-box" style={{ color: '#B91C1C', background: '#FEE2E2' }}>
+                Sizga hech qanday toifaga ruxsat berilmagan. Superadmin bilan bog'laning.
+              </div>
+            )}
+
             <div className="ap-category-selects">
               {/* 1-daraja */}
               <div className="ap-select-wrap">
                 <select
                   className="ap-select"
                   value={cat1}
+                  disabled={treeLoading || cat1Options.length === 0}
                   onChange={e => handleCat1Change(e.target.value)}
                 >
-                  <option value="">Toifani tanlang</option>
+                  <option value="">
+                    {treeLoading ? 'Yuklanmoqda…' : 'Toifani tanlang'}
+                  </option>
                   {cat1Options.map(o => <option key={o} value={o}>{o}</option>)}
                 </select>
                 <ChevronDown size={16} className="ap-select-icon" />
@@ -637,66 +561,26 @@ export default function AddProduct({ user }: Props) {
               </div>
             </div>
 
+            {/* Tavsif — oddiy matn maydoni. Ilova tavsifni oddiy matn sifatida
+                ko'rsatadi, shuning uchun bu yerda ham HTML formatlash yo'q. */}
             <div className="ap-field-wrap" style={{ marginTop: '32px' }}>
-              <label className="ap-label" style={{ fontSize: '16px', fontWeight: '600', marginBottom: '4px' }}>Tovar qisqacha tavsifi <span className="ap-required">*</span></label>
-              
-              <div style={{ border: '1px solid #E2E8F0', borderRadius: '8px', overflow: 'hidden' }}>
-                <div style={{ padding: '8px 12px', borderBottom: '1px solid #E2E8F0', background: '#F8FAFC', display: 'flex', gap: '16px', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button 
-                      type="button"
-                      onClick={() => document.execCommand('undo')}
-                      style={{ cursor: 'pointer', background: 'none', border: 'none', color: '#475569', fontSize: '16px' }}>↶</button>
-                    <button 
-                      type="button"
-                      onClick={() => document.execCommand('redo')}
-                      style={{ cursor: 'pointer', background: 'none', border: 'none', color: '#475569', fontSize: '16px' }}>↷</button>
-                  </div>
-                  <div className="ap-select-wrap" style={{ margin: 0 }}>
-                    <select 
-                      className="ap-select" 
-                      onChange={(e) => document.execCommand('fontName', false, e.target.value)}
-                      style={{ padding: '4px 28px 4px 12px', fontSize: '13px' }}>
-                      <option value="Inter">Paragraph (Inter)</option>
-                      <option value="Arial">Arial</option>
-                      <option value="Helvetica">Helvetica</option>
-                      <option value="Times New Roman">Times New Roman</option>
-                      <option value="Courier New">Courier New</option>
-                      <option value="Verdana">Verdana</option>
-                      <option value="Georgia">Georgia</option>
-                      <option value="Palatino">Palatino</option>
-                      <option value="Garamond">Garamond</option>
-                      <option value="Bookman">Bookman</option>
-                      <option value="Tahoma">Tahoma</option>
-                    </select>
-                    <ChevronDown size={14} className="ap-select-icon" />
-                  </div>
-                  <div style={{ display: 'flex', gap: '12px', color: '#475569', fontWeight: 'bold' }}>
-                    <button 
-                      type="button"
-                      onClick={() => document.execCommand('bold')}
-                      style={{ cursor: 'pointer', background: 'none', border: 'none', fontWeight: 'bold', fontSize: '16px' }}>B</button>
-                    <button 
-                      type="button"
-                      onClick={() => document.execCommand('italic')}
-                      style={{ cursor: 'pointer', background: 'none', border: 'none', fontStyle: 'italic', fontFamily: 'serif', fontSize: '16px' }}>I</button>
-                  </div>
-                </div>
-                <div
+              <label className="ap-label" htmlFor="ap-description">
+                Tovar qisqacha tavsifi <span className="ap-required">*</span>
+              </label>
+              <div className="ap-input-row">
+                <textarea
+                  id="ap-description"
                   className="ap-textarea"
-                  contentEditable
-                  onInput={e => set('description', e.currentTarget.innerHTML)}
-                  onKeyDown={e => {
-                    if (e.ctrlKey || e.metaKey) {
-                      if (e.key === 'b') { e.preventDefault(); document.execCommand('bold'); }
-                      if (e.key === 'i') { e.preventDefault(); document.execCommand('italic'); }
-                    }
-                  }}
-                  style={{ border: 'none', borderRadius: 0, minHeight: '120px', outline: 'none', padding: '16px' }}
-                  dangerouslySetInnerHTML={{ __html: form.description || '' }}
+                  rows={3}
+                  maxLength={DESCRIPTION_MAX}
+                  placeholder="Tovarning qisqacha tavsifi"
+                  value={form.description}
+                  onChange={e => set('description', e.target.value)}
                 />
               </div>
-              <div className="ap-char-count">{form.description.replace(/<[^>]*>?/gm, '').length}/390</div>
+              <div className="ap-char-count" style={{ color: descTooLong ? '#DC2626' : undefined }}>
+                {form.description.length}/{DESCRIPTION_MAX}
+              </div>
             </div>
           </div>
 

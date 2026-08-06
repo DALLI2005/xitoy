@@ -179,6 +179,7 @@ fun HomeScreen(
     val favorites = FavoritesManager.favorites.collectAsState().value
     val searchQuery = viewModel.searchQuery.collectAsState().value
     val filterState by viewModel.filterState.collectAsState()
+    val availableCategories by viewModel.availableCategories.collectAsState()
     val session by SessionManager.session.collectAsState()
     val ordersState by ordersViewModel.state.collectAsState()
     var quickAddProduct by remember { mutableStateOf<Product?>(null) }
@@ -399,7 +400,11 @@ fun HomeScreen(
             }
 
             item(span = { GridItemSpan(maxLineSpan) }) {
-                CategoryChipRow(selected = searchQuery, onCategoryClick = { viewModel.onSearchQueryChange(it) })
+                CategoryChipRow(
+                    categories = availableCategories,
+                    selected = searchQuery,
+                    onCategoryClick = { viewModel.onSearchQueryChange(it) }
+                )
             }
 
             item(span = { GridItemSpan(maxLineSpan) }) {
@@ -529,10 +534,7 @@ fun HomeScreen(
     if (showFilterSheet) {
         FilterBottomSheet(
             currentFilter = filterState,
-            availableCategories = listOf(
-                "Aksessuar", "Kiyim", "Elektronika",
-                "Boshqa", "Sport", "Poyabzal", "Uy uchun"
-            ),
+            availableCategories = availableCategories,
             minPrice = 0f,
             maxPrice = 1_000_000f,
             onApply = { newFilter ->
@@ -954,15 +956,20 @@ private fun DeliveryBanner(order: OrderItem, stage: Int, onClick: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CategoryChipRow(selected: String, onCategoryClick: (String) -> Unit) {
-    val categories = listOf("Hammasi", "Elektronika", "Kiyim", "Poyabzal", "Aksessuar", "Sport", "Uy uchun")
+private fun CategoryChipRow(
+    categories: List<String>,
+    selected: String,
+    onCategoryClick: (String) -> Unit
+) {
+    // "Hammasi" + backenddan kelgan haqiqiy toifalar
+    val chips = remember(categories) { listOf("Hammasi") + categories }
     Row(
         modifier = Modifier
             .horizontalScroll(rememberScrollState())
             .padding(vertical = 2.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        categories.forEach { cat ->
+        chips.forEach { cat ->
             val isAll = cat == "Hammasi"
             val isSelected = if (isAll) selected.isBlank() else selected.equals(cat, ignoreCase = true)
             Box(

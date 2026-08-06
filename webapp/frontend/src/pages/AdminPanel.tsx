@@ -6,9 +6,11 @@ import type { Admin } from '../types'
 
 type Channel = { id: number; channel_id: string; label: string; enabled: number }
 
-const ALL_CATS = ['Kiyim', 'Elektronika', 'Poyabzal', 'Aksessuar', 'Sport', 'Uy uchun', 'Boshqa']
-
 export default function AdminPanel() {
+  // Ruxsat beriladigan toifalar backenddan olinadi (yagona manba — categories.py).
+  // Ilgari bu yerda qo'lda yozilgan ro'yxat bor edi va undagi nomlarning ko'pi
+  // backendda umuman mavjud emasdi — shu sababli adminlar tovar qo'sha olmasdi.
+  const [allCats, setAllCats] = useState<string[]>([])
   const [admins, setAdmins]   = useState<Admin[]>([])
   const [stats, setStats]     = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -42,10 +44,10 @@ export default function AdminPanel() {
   async function load() {
     setLoading(true)
     try {
-      const [a, s, settings] = await Promise.all([
-        api.admins(), api.stats(), api.getNotificationSettings()
+      const [a, s, settings, cats] = await Promise.all([
+        api.admins(), api.stats(), api.getNotificationSettings(), api.categories()
       ])
-      setAdmins(a); setStats(s)
+      setAdmins(a); setStats(s); setAllCats(cats)
       setNotifEnabled(settings.marketing_notifications_enabled)
     } catch (e: any) {
       setError(e.message)
@@ -416,7 +418,7 @@ export default function AdminPanel() {
             <div>
               <p className="text-xs mb-2" style={{ color: 'var(--fg-muted)' }}>Kategoriyalar:</p>
               <div className="flex flex-wrap gap-1.5">
-                {ALL_CATS.map(cat => (
+                {allCats.map(cat => (
                   <button
                     key={cat}
                     type="button"
@@ -518,7 +520,7 @@ export default function AdminPanel() {
             {editId === admin.telegram_id ? (
               <div className="mt-3">
                 <div className="flex flex-wrap gap-1.5 mb-3">
-                  {ALL_CATS.map(cat => (
+                  {allCats.map(cat => (
                     <button
                       key={cat}
                       type="button"

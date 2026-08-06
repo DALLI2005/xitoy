@@ -80,15 +80,14 @@ def fix_image_url(url: str) -> str:
     return url
 
 
-CATEGORIES = [
-    "Texnika va elektronika", "Yozgi kolleksiya", "Mebel", "Turizm, baliq ovi va ovchilik",
-    "Elektronika", "Maishiy texnika", "Kiyim", "Poyabzallar", "Aksessuarlar",
-    "Go'zallik va parvarish", "Salomatlik", "Uy-ro'zg'or buyumlari", "Qurilish va ta'mirlash",
-    "Avtotovarlar", "Bolalar tovarlari", "Xobbi va ijod", "Sport va hordiq",
-    "Oziq-ovqat mahsulotlari", "Maishiy kimyoviy moddalar", "Kanselyariya tovarlari",
-    "Hayvonlar uchun tovarlar", "Kitoblar", "Dacha, bog' va tomorqa",
-    "Reabilitatsiya uchun subsidiyalangan mahsulotlar", "Boshqa"
-]
+# Kategoriyalar — yagona manba `categories.py` da (backend + sayt + ilova shu daraxtdan
+# foydalanadi). CATEGORIES = daraxtning 1-darajasi; adminlar ruxsati shu nomlar bilan beriladi.
+from categories import (  # noqa: E402
+    CATEGORIES,
+    CATEGORY_TREE,
+    path_string as category_path_string,
+    resolve as resolve_category,
+)
 
 # Sarlavha qisqartirish uchun keraksiz marketing so'zlari ro'yxati
 # (real tarjima natijalarini ko'rib, kengaytirish mumkin)
@@ -293,6 +292,31 @@ async def check_cart_reminders():
 
 
 # ── Database ───────────────────────────────────────────────────────────────────
+async def _migrate_product_categories(db) -> None:
+    """Eski tovarlarni 3 darajali kategoriyaga o'tkazadi.
+
+    Ilgari `category` ustuniga ba'zan 3-darajali nom ("Aqlli uy") yozilardi —
+    u adminning ruxsat ro'yxati (1-daraja) bilan hech qachon mos kelmasdi.
+    Bu yerda har bir yozuv daraxt bo'yicha (root, sub, leaf) ga yoyiladi.
+    """
+    async with db.execute(
+        "SELECT id, category, subcategory, product_type FROM products"
+    ) as cur:
+        rows = await cur.fetchall()
+
+    fixed = 0
+    for pid, cat, sub, ptype in rows:
+        root, new_sub, new_leaf = resolve_category(cat or "", sub or "", ptype or "")
+        if (root, new_sub, new_leaf) != (cat, sub or "", ptype or ""):
+            await db.execute(
+                "UPDATE products SET category = ?, subcategory = ?, product_type = ? WHERE id = ?",
+                (root, new_sub, new_leaf, pid),
+            )
+            fixed += 1
+    if fixed:
+        log.info("Kategoriya migratsiyasi: %d ta tovar normallashtirildi", fixed)
+
+
 async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute(f"""
@@ -380,6 +404,27 @@ async def init_db():
             await db.execute("ALTER TABLE products ADD COLUMN telegram_message_id INTEGER DEFAULT 0")
         except aiosqlite.OperationalError:
             pass
+        # 3 darajali kategoriya: category = asosiy toifa, subcategory = kichik toifa,
+        # product_type = tovar turi. Eski tovarlarda faqat `category` bo'lgan.
+        for _col in ("subcategory", "product_type"):
+            try:
+                await db.execute(f"ALTER TABLE products ADD COLUMN {_col} TEXT DEFAULT ''")
+            except aiosqlite.OperationalError:
+                pass
+        # Admin kiritadigan qo'shimcha ma'lumotlar — ilovadagi tovar kartochkasida ko'rinadi
+        for _col, _default in (
+            ("country", "''"),           # Ishlab chiqarilgan mamlakat
+            ("attributes", "'{}'"),      # Xususiyatlar: {"Rang": ["Qora"], ...}
+        ):
+            try:
+                await db.execute(f"ALTER TABLE products ADD COLUMN {_col} TEXT DEFAULT {_default}")
+            except aiosqlite.OperationalError:
+                pass
+        try:
+            await db.execute("ALTER TABLE products ADD COLUMN guarantee_months INTEGER DEFAULT 0")
+        except aiosqlite.OperationalError:
+            pass
+        await _migrate_product_categories(db)
         # Superadmin — barcha kategoriyalar
         await db.execute("""
             INSERT OR IGNORE INTO admins (telegram_id, name, categories)
@@ -945,8 +990,13 @@ class ProductIn(BaseModel):
     name:             str
     price:            int
     discount:         int       = 0
-    category:         str
+    category:         str                 # 1-daraja — asosiy toifa (ruxsat shu bo'yicha)
+    subcategory:      str       = ""      # 2-daraja — kichik toifa
+    product_type:     str       = ""      # 3-daraja — tovar turi
     description:      str       = ""
+    country:          str       = ""      # Ishlab chiqarilgan mamlakat
+    guarantee_months: int       = 0       # Kafolat (oylarda); 0 = qonun bo'yicha 6 oy
+    attributes:       dict[str, list[str]] = {}   # {"Rang": ["Qora","Oq"], ...}
     image_url:        str
     images:           list[str] = []
     rating:           float     = 4.5
@@ -961,11 +1011,27 @@ class ProductIn(BaseModel):
     razmer_matritsa: dict | None = None
 
 
+def _normalize_admin_categories(cats: list[str]) -> list[str]:
+    """Admin ruxsati faqat 1-daraja (asosiy toifa) bo'yicha saqlanadi.
+    Kichik toifa yoki tovar turi kelsa — uning asosiy toifasiga keltiriladi."""
+    seen: list[str] = []
+    for c in cats:
+        root = resolve_category(c)[0] if c not in CATEGORIES else c
+        if root not in seen:
+            seen.append(root)
+    return seen
+
+
 class AdminIn(BaseModel):
     telegram_id: int
     name:        str
     categories:  list[str]
     password:    str
+
+    @field_validator("categories")
+    @classmethod
+    def _only_root_categories(cls, v: list[str]) -> list[str]:
+        return _normalize_admin_categories(v)
 
     @field_validator("password")
     @classmethod
@@ -981,6 +1047,11 @@ class AdminPatch(BaseModel):
     active:     bool | None       = None
     password:   str | None        = None
 
+    @field_validator("categories")
+    @classmethod
+    def _only_root_categories(cls, v: list[str] | None) -> list[str] | None:
+        return None if v is None else _normalize_admin_categories(v)
+
 
 class ProductPatch(BaseModel):
     active:   bool | None = None
@@ -992,7 +1063,12 @@ class ProductUpdate(BaseModel):
     price:               int | None       = None
     discount:            int | None       = None
     category:            str | None       = None
+    subcategory:         str | None       = None
+    product_type:        str | None       = None
     description:         str | None       = None
+    country:             str | None       = None
+    guarantee_months:    int | None       = None
+    attributes:          dict[str, list[str]] | None = None
     image_url:           str | None       = None
     images:              list[str] | None = None
     variantlar_yoqilgan: bool | None      = None
@@ -1260,7 +1336,14 @@ async def get_me(user: dict = Depends(get_current_user)):
 # ── /api/categories ────────────────────────────────────────────────────────────
 @app.get("/api/categories")
 async def get_categories():
+    """1-daraja (asosiy toifalar) — adminlarga ruxsat berishda ishlatiladi."""
     return CATEGORIES
+
+
+@app.get("/api/categories/tree")
+async def get_category_tree():
+    """To'liq 3 darajali daraxt — sayt va ilova shu javobdan foydalanadi."""
+    return {"roots": CATEGORIES, "tree": CATEGORY_TREE}
 
 
 # ── /api/products ──────────────────────────────────────────────────────────────
@@ -1293,6 +1376,12 @@ async def list_products(
         var_narx = json.loads(d.get("variant_narxlari") or "[]")
         razmer = json.loads(d.get("razmer_matritsa") or "{}")
 
+        # Kategoriya har doim to'liq 3 darajali yo'l bo'lib qaytadi — sayt ham,
+        # ilova ham bir xil ma'lumotni ko'radi.
+        cat_root, cat_sub, cat_leaf = resolve_category(
+            d.get("category", ""), d.get("subcategory", ""), d.get("product_type", "")
+        )
+
         products.append({
             "id":                 d["id"],
             "title":              d["name"],
@@ -1301,7 +1390,16 @@ async def list_products(
             "price":              d.get("price", 0),
             "discount":           d.get("discount", 0),
             "discountPercent":    int(d.get("discount", 0)),
-            "category":           d.get("category", "Boshqa"),
+            "category":           cat_root,
+            "subcategory":        cat_sub,
+            "product_type":       cat_leaf,
+            "productType":        cat_leaf,
+            "categoryPath":       [p for p in (cat_root, cat_sub, cat_leaf) if p],
+            # Admin kiritgan qo'shimcha ma'lumotlar — ilovadagi kartochka uchun
+            "country":            d.get("country", "") or "",
+            "guarantee_months":   int(d.get("guarantee_months", 0) or 0),
+            "guaranteeMonths":    int(d.get("guarantee_months", 0) or 0),
+            "attributes":         json.loads(d.get("attributes") or "{}"),
             "image":              img_url,
             "image_url":          img_url,
             "imageUrl":           img_url,
@@ -1356,6 +1454,13 @@ async def update_product(
     if not payload:
         raise HTTPException(400, "Hech narsa o'zgartirilmadi")
 
+    # Kategoriya tegilgan bo'lsa — uchala darajani ham daraxt bo'yicha qayta hisoblaymiz
+    if {"category", "subcategory", "product_type"} & payload.keys():
+        root, sub, leaf = resolve_category(
+            payload.get("category", ""), payload.get("subcategory", ""), payload.get("product_type", "")
+        )
+        payload["category"], payload["subcategory"], payload["product_type"] = root, sub, leaf
+
     async with aiosqlite.connect(DB_PATH) as db:
         fields, values = [], []
         for k, v in payload.items():
@@ -1395,8 +1500,18 @@ async def clear_all_products(user: dict = Depends(require_super)):
 
 @app.post("/api/products", status_code=201)
 async def add_product(product: ProductIn, user: dict = Depends(get_current_user)):
-    if product.category not in user["categories"]:
-        raise HTTPException(403, f"'{product.category}' kategoriyasiga ruxsat yo'q")
+    # Kelgan kategoriyani daraxt bo'yicha to'liq yo'lga keltiramiz. Sayt 3-darajali
+    # nom ("Aqlli uy") yuborsa ham, uning asosiy toifasi ("Elektronika") topiladi —
+    # ruxsat esa doim asosiy toifa bo'yicha tekshiriladi.
+    root, subcategory, product_type = resolve_category(
+        product.category, product.subcategory, product.product_type
+    )
+    if root not in user["categories"]:
+        raise HTTPException(
+            403,
+            f"'{category_path_string(root, subcategory, product_type)}' — "
+            f"'{root}' toifasiga ruxsatingiz yo'q",
+        )
 
     images_json = json.dumps(product.images or ([product.image_url] if product.image_url else []))
     var_nom_json = json.dumps(product.variant_nomlari or [])
@@ -1407,16 +1522,19 @@ async def add_product(product: ProductIn, user: dict = Depends(get_current_user)
         cur = await db.execute(
             """
             INSERT INTO products (
-                name, price, discount, category, description, image_url, images,
+                name, price, discount, category, subcategory, product_type, description, image_url, images,
                 rating, sold_count, discount_type, discount_expires, auto_delete,
-                active, in_stock, variantlar_yoqilgan, variant_nomlari, variant_narxlari, razmer_matritsa, added_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?, ?, ?)
+                active, in_stock, variantlar_yoqilgan, variant_nomlari, variant_narxlari, razmer_matritsa,
+                country, guarantee_months, attributes, added_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                product.name, product.price, product.discount, product.category, product.description,
+                product.name, product.price, product.discount,
+                root, subcategory, product_type, product.description,
                 product.image_url, images_json, product.rating, product.sold_count, product.discount_type,
                 product.discount_expires, 1 if product.auto_delete else 0,
                 1 if product.variantlar_yoqilgan else 0, var_nom_json, var_narx_json, razmer_json,
+                product.country, max(0, product.guarantee_months), json.dumps(product.attributes or {}),
                 str(user.get("telegram_id", ""))
             )
         )
@@ -1429,11 +1547,11 @@ async def add_product(product: ProductIn, user: dict = Depends(get_current_user)
         f"👤 {user['name']}\n"
         f"📌 {product.name}\n"
         f"💰 {product.price:,} so'm{discount_txt}\n"
-        f"📂 {product.category}"
+        f"📂 {category_path_string(root, subcategory, product_type)}"
     )
 
     asyncio.create_task(_channel_post_task(
-        new_id, product.image_url, product.name, product.category,
+        new_id, product.image_url, product.name, root,
         product.price, product.discount, product.discount_type, product.discount_expires,
     ))
 

@@ -6,6 +6,9 @@ export interface User {
   is_superadmin: boolean
 }
 
+// Kategoriya daraxti: "Asosiy toifa" -> "Kichik toifa" -> ["Tovar turi", ...]
+export type CategoryTree = Record<string, Record<string, string[]>>
+
 export interface Product {
   id?: string | number
   title?: string
@@ -13,7 +16,11 @@ export interface Product {
   price: number
   discountPercent?: number
   discount?: number
-  category: string
+  category: string          // 1-daraja
+  subcategory?: string      // 2-daraja
+  product_type?: string     // 3-daraja
+  productType?: string
+  categoryPath?: string[]
   description?: string
   image_url?: string
   imageUrl?: string

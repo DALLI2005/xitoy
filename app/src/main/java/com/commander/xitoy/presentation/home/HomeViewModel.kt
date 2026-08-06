@@ -70,6 +70,19 @@ class HomeViewModel @Inject constructor(
             initialValue = 0
         )
 
+    /**
+     * Mavjud asosiy toifalar — mahsulotlardan olinadi, qo'lda yozilmaydi.
+     * Chiplar va filtr shu ro'yxatdan foydalanadi, shuning uchun ular doim
+     * backenddagi (categories.py) kategoriyalar bilan mos keladi.
+     */
+    val availableCategories: StateFlow<List<String>> = _products
+        .map { products -> products.map { it.category }.filter { it.isNotBlank() }.distinct().sorted() }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList()
+        )
+
     @OptIn(FlowPreview::class)
     val filteredProducts: StateFlow<List<Product>> = combine(
         _products,
@@ -79,14 +92,19 @@ class HomeViewModel @Inject constructor(
         var result = products
 
         if (query.isNotBlank()) {
+            // Qidiruv kategoriyaning uchala darajasi bo'yicha ham ishlaydi
             result = result.filter { product ->
                 product.name.contains(query, ignoreCase = true) ||
-                        product.category.contains(query, ignoreCase = true)
+                        product.category.contains(query, ignoreCase = true) ||
+                        product.subcategory.contains(query, ignoreCase = true) ||
+                        product.productType.contains(query, ignoreCase = true)
             }
         }
 
         if (filter.selectedCategories.isNotEmpty()) {
-            result = result.filter { it.category in filter.selectedCategories }
+            result = result.filter { product ->
+                filter.selectedCategories.any { product.matchesCategory(it) }
+            }
         }
 
         result = result.filter { product ->

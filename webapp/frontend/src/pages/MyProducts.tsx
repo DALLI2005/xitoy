@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Package, RefreshCw, Pencil, Trash2, X, Check, Search } from 'lucide-react'
 import { api } from '../api'
-import type { Product, User } from '../types'
+import type { Product, User, CategoryTree } from '../types'
 
 interface Props { user: User }
 
@@ -19,29 +19,30 @@ function SkeletonRow() {
   )
 }
 
-const CAT_COLORS: Record<string, string> = {
-  'Kiyim':       'rgba(99,102,241,0.15)',
-  'Elektronika': 'rgba(6,182,212,0.15)',
-  'Poyabzal':    'rgba(34,197,94,0.15)',
-  'Aksessuar':   'rgba(245,158,11,0.15)',
-  'Sport':       'rgba(239,68,68,0.15)',
-  'Uy uchun':    'rgba(168,85,247,0.15)',
-  'Boshqa':      'rgba(255,255,255,0.06)',
-}
-const CAT_TEXT: Record<string, string> = {
-  'Kiyim':       '#818cf8',
-  'Elektronika': '#22d3ee',
-  'Poyabzal':    '#4ade80',
-  'Aksessuar':   '#fbbf24',
-  'Sport':       '#f87171',
-  'Uy uchun':    '#c084fc',
-  'Boshqa':      '#71717a',
+// Kategoriyalar backenddan keladi va ro'yxati uzun — rangni nom asosida
+// barqaror hisoblaymiz (bir xil toifa doim bir xil rangda ko'rinadi).
+const CAT_PALETTE = [
+  { bg: 'rgba(99,102,241,0.15)',  fg: '#818cf8' },
+  { bg: 'rgba(6,182,212,0.15)',   fg: '#22d3ee' },
+  { bg: 'rgba(34,197,94,0.15)',   fg: '#4ade80' },
+  { bg: 'rgba(245,158,11,0.15)',  fg: '#fbbf24' },
+  { bg: 'rgba(239,68,68,0.15)',   fg: '#f87171' },
+  { bg: 'rgba(168,85,247,0.15)',  fg: '#c084fc' },
+  { bg: 'rgba(236,72,153,0.15)',  fg: '#f472b6' },
+  { bg: 'rgba(20,184,166,0.15)',  fg: '#2dd4bf' },
+]
+function catColor(cat: string) {
+  if (!cat || cat === 'Boshqa') return { bg: 'rgba(255,255,255,0.06)', fg: '#71717a' }
+  let hash = 0
+  for (let i = 0; i < cat.length; i++) hash = (hash * 31 + cat.charCodeAt(i)) >>> 0
+  return CAT_PALETTE[hash % CAT_PALETTE.length]
 }
 
 type Filter = 'all' | 'inactive' | 'outofstock'
 
 interface EditForm {
-  name: string; price: string; discount: string; category: string; description: string
+  name: string; price: string; discount: string; description: string
+  category: string; subcategory: string; product_type: string
   variantlar_yoqilgan: boolean
   variant_nomlari: string[]
   variant_narxlari: string[]
@@ -57,7 +58,8 @@ export default function MyProducts({ user }: Props) {
 
   // Edit modal
   const [editProduct, setEditProduct] = useState<Product | null>(null)
-  const [editForm, setEditForm]       = useState<EditForm>({ name: '', price: '', discount: '', category: '', description: '', variantlar_yoqilgan: false, variant_nomlari: [], variant_narxlari: [] })
+  const [editForm, setEditForm]       = useState<EditForm>({ name: '', price: '', discount: '', description: '', category: '', subcategory: '', product_type: '', variantlar_yoqilgan: false, variant_nomlari: [], variant_narxlari: [] })
+  const [categoryTree, setCategoryTree] = useState<CategoryTree>({})
   const [editSaving, setEditSaving]   = useState(false)
   const [editError, setEditError]     = useState('')
   const [sizesByColor, setSizesByColor] = useState<Record<number, {nomi: string, narx: string}[]>>({})
@@ -97,6 +99,22 @@ export default function MyProducts({ user }: Props) {
 
   useEffect(() => { load() }, [])
 
+  // Kategoriya daraxti — backend bilan bir xil manba
+  useEffect(() => {
+    api.categoryTree()
+      .then(res => setCategoryTree(res.tree || {}))
+      .catch(() => {})
+  }, [])
+
+  // Tahrirda admin faqat o'ziga ruxsat berilgan asosiy toifalarni ko'radi
+  const allowedRoots = user.is_superadmin
+    ? Object.keys(categoryTree)
+    : Object.keys(categoryTree).filter(r => user.categories.includes(r))
+  const editSubs  = editForm.category ? Object.keys(categoryTree[editForm.category] || {}) : []
+  const editTypes = editForm.category && editForm.subcategory
+    ? (categoryTree[editForm.category]?.[editForm.subcategory] || [])
+    : []
+
   function openEdit(p: Product) {
     setEditProduct(p)
     setEditError('')
@@ -105,6 +123,8 @@ export default function MyProducts({ user }: Props) {
       price:               String(p.price),
       discount:            String(p.discountPercent || p.discount || 0),
       category:            p.category || '',
+      subcategory:         p.subcategory || '',
+      product_type:        p.product_type || p.productType || '',
       description:         p.description || '',
       variantlar_yoqilgan: p.variantlarYoqilgan ?? false,
       variant_nomlari:     p.variantNomlari ?? [],
@@ -145,6 +165,8 @@ export default function MyProducts({ user }: Props) {
         price:               basePrice,
         discount:            parseInt(editForm.discount || '0') || 0,
         category:            editForm.category,
+        subcategory:         editForm.subcategory,
+        product_type:        editForm.product_type,
         description:         editForm.description.trim(),
         variantlar_yoqilgan: editForm.variantlar_yoqilgan,
         variant_nomlari:     editForm.variant_nomlari,
@@ -157,6 +179,8 @@ export default function MyProducts({ user }: Props) {
               price: basePrice,
               discountPercent: parseInt(editForm.discount || '0') || 0,
               category: editForm.category,
+              subcategory: editForm.subcategory,
+              product_type: editForm.product_type,
               description: editForm.description.trim() }
           : p
       ))
@@ -330,6 +354,10 @@ export default function MyProducts({ user }: Props) {
                   const imgUrl   = p.image_url || p.imageUrl
                   const discount = p.discountPercent || p.discount || 0
                   const cat      = p.category || 'Boshqa'
+                  const catPath  = (p.categoryPath && p.categoryPath.length
+                    ? p.categoryPath
+                    : [cat, p.subcategory, p.product_type || p.productType].filter(Boolean)
+                  ).join(' › ')
                   const active   = p.active  !== false
                   const inStock  = p.inStock !== false
 
@@ -353,9 +381,18 @@ export default function MyProducts({ user }: Props) {
                         <p className="text-xs mt-1 font-mono" style={{ color: 'var(--fg-muted)' }}>#{id}</p>
                       </td>
                       <td className="p-4">
-                        <span className="text-xs px-2.5 py-1 rounded-md font-semibold" style={{ background: CAT_COLORS[cat] || CAT_COLORS['Boshqa'], color: CAT_TEXT[cat] || CAT_TEXT['Boshqa'] }}>
+                        <span
+                          className="text-xs px-2.5 py-1 rounded-md font-semibold"
+                          style={{ background: catColor(cat).bg, color: catColor(cat).fg }}
+                          title={catPath}
+                        >
                           {cat}
                         </span>
+                        {catPath !== cat && (
+                          <p className="text-[11px] mt-1 truncate max-w-[160px]" style={{ color: 'var(--fg-muted)' }} title={catPath}>
+                            {[p.subcategory, p.product_type || p.productType].filter(Boolean).join(' › ')}
+                          </p>
+                        )}
                       </td>
                       <td className="p-4">
                         <div className="flex flex-col gap-1">
@@ -488,22 +525,40 @@ export default function MyProducts({ user }: Props) {
                 </div>
               </div>
 
-              {/* Kategoriya */}
+              {/* Kategoriya — 3 daraja, backenddagi daraxt bilan bir xil */}
               <div>
                 <label className="text-xs font-bold mb-2 block uppercase tracking-wider" style={{ color: 'var(--fg-muted)' }}>Kategoriya</label>
-                <div className="flex flex-wrap gap-2">
-                  {['Kiyim','Elektronika','Poyabzal','Aksessuar','Sport','Uy uchun','Boshqa'].map(cat => (
-                    <button
-                      key={cat} type="button" disabled={editSaving}
-                      onClick={() => setEditForm(f => ({ ...f, category: cat }))}
-                      className="px-3 py-1.5 rounded-lg text-sm font-semibold cursor-pointer transition-colors"
-                      style={editForm.category === cat 
-                        ? { background: 'rgba(99,102,241,0.2)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.4)' }
-                        : { background: 'var(--bg)', color: 'var(--fg)', border: '1px solid var(--border)' }}
+                <div className="flex flex-col gap-2">
+                  <select
+                    className="field w-full" disabled={editSaving || allowedRoots.length === 0}
+                    value={editForm.category}
+                    onChange={e => setEditForm(f => ({ ...f, category: e.target.value, subcategory: '', product_type: '' }))}
+                  >
+                    <option value="">Asosiy toifani tanlang</option>
+                    {allowedRoots.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+
+                  {editForm.category && (
+                    <select
+                      className="field w-full" disabled={editSaving}
+                      value={editForm.subcategory}
+                      onChange={e => setEditForm(f => ({ ...f, subcategory: e.target.value, product_type: '' }))}
                     >
-                      {cat}
-                    </button>
-                  ))}
+                      <option value="">Kichik toifani tanlang</option>
+                      {editSubs.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  )}
+
+                  {editForm.subcategory && (
+                    <select
+                      className="field w-full" disabled={editSaving}
+                      value={editForm.product_type}
+                      onChange={e => setEditForm(f => ({ ...f, product_type: e.target.value }))}
+                    >
+                      <option value="">Tovar turini tanlang</option>
+                      {editTypes.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  )}
                 </div>
               </div>
 

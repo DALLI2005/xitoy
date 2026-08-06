@@ -60,14 +60,25 @@ export const api = {
 
   categories: () => request<string[]>('/categories', { headers: headers() }),
 
+  // To'liq 3 darajali kategoriya daraxti — backenddagi categories.py yagona manba
+  categoryTree: () =>
+    request<{ roots: string[]; tree: import('./types').CategoryTree }>('/categories/tree', {
+      headers: headers(),
+    }),
+
   products: () => request<import('./types').Product[]>('/products', { headers: headers() }),
 
   addProduct: (data: {
     name: string
     price: number
     discount: number
-    category: string
+    category: string        // 1-daraja — asosiy toifa
+    subcategory?: string    // 2-daraja
+    product_type?: string   // 3-daraja
     description: string
+    country?: string                          // Ishlab chiqarilgan mamlakat
+    guarantee_months?: number                 // Kafolat (oylarda)
+    attributes?: Record<string, string[]>     // Xususiyatlar: {"Rang": ["Qora"], ...}
     image_url: string
     images: string[]
     rating?: number
@@ -134,7 +145,8 @@ export const api = {
 
   updateProduct: (id: number | string, data: {
     name?: string; price?: number; discount?: number
-    category?: string; description?: string
+    category?: string; subcategory?: string; product_type?: string
+    description?: string
     variantlar_yoqilgan?: boolean
     variant_nomlari?: string[]
     variant_narxlari?: number[]

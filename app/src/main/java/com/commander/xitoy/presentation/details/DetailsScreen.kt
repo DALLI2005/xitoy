@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -33,9 +34,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -55,6 +59,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -69,6 +74,7 @@ import com.commander.xitoy.presentation.home.ProductCard
 import com.commander.xitoy.ui.theme.DalliAccent
 import com.commander.xitoy.ui.theme.DalliBackground
 import com.commander.xitoy.ui.theme.DalliLine
+import com.commander.xitoy.ui.theme.DalliLine2
 import com.commander.xitoy.ui.theme.DalliMuted
 import com.commander.xitoy.ui.theme.DalliPrimary
 import com.commander.xitoy.ui.theme.DalliPrimarySoft
@@ -76,16 +82,19 @@ import com.commander.xitoy.ui.theme.DalliSuccess
 import com.commander.xitoy.ui.theme.DalliSurface
 import com.commander.xitoy.ui.theme.DalliSurfaceAlt
 import com.commander.xitoy.ui.theme.DalliText
+import com.commander.xitoy.ui.theme.DalliTextSecondary
 import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.ChevronLeft
 import com.composables.icons.lucide.CircleCheck
 import com.composables.icons.lucide.Flame
+import com.composables.icons.lucide.Globe
 import com.composables.icons.lucide.Heart
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Minus
 import com.composables.icons.lucide.Package
 import com.composables.icons.lucide.Plus
 import com.composables.icons.lucide.ShoppingCart
+import com.composables.icons.lucide.ShieldCheck
 import com.composables.icons.lucide.Star
 import com.composables.icons.lucide.Truck
 import kotlinx.coroutines.delay
@@ -162,10 +171,18 @@ fun DetailsScreen(
         }
     }
 
-    // O'xshash tovarlar: avval shu kategoriya, keyin boshqalar (max 6)
+    // O'xshash tovarlar: avval eng yaqin toifa (tovar turi → kichik toifa →
+    // asosiy toifa), keyin qolganlari (max 6)
     val similar = remember(product.id, allProducts) {
-        (allProducts.filter { it.category == product.category && it.id != product.id } +
-            allProducts.filter { it.category != product.category }).take(6)
+        val others = allProducts.filter { it.id != product.id }
+        val sameType = others.filter {
+            product.productType.isNotBlank() && it.productType == product.productType
+        }
+        val sameSub = others.filter {
+            product.subcategory.isNotBlank() && it.subcategory == product.subcategory
+        }
+        val sameRoot = others.filter { it.category == product.category }
+        (sameType + sameSub + sameRoot + others).distinctBy { it.id }.take(6)
     }
 
     val displayRating = if (product.rating > 0f) product.rating else 3.5f + (product.id % 15) * 0.1f
@@ -384,7 +401,8 @@ fun DetailsScreen(
                 Column {
                     if (product.category.isNotBlank()) {
                         Text(
-                            text = product.category,
+                            // To'liq yo'l: "Elektronika › Aqlli uy va xavfsizlik › Aqlli uy"
+                            text = product.fullCategoryPath,
                             fontSize = 12.5.sp,
                             fontWeight = FontWeight.Bold,
                             color = DalliPrimary
@@ -475,31 +493,47 @@ fun DetailsScreen(
                     }
                 }
 
-                // Info chiplar
+                // Info chiplar — haqiqiy ma'lumot: yetkazish, kafolat, mamlakat
                 Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                     InfoChip(icon = Lucide.Truck, value = "8-12 kun", label = "Yetkazish", tone = DalliAccent)
-                    InfoChip(icon = Lucide.CircleCheck, value = "Mavjud", label = "Omborda", tone = DalliSuccess)
                     InfoChip(
-                        icon = Lucide.Package,
-                        value = product.category.ifBlank { "Original" },
-                        label = "Kategoriya",
-                        tone = DalliPrimary
+                        icon = Lucide.ShieldCheck,
+                        value = product.guaranteeText,
+                        label = "Kafolat",
+                        tone = DalliSuccess
                     )
-                }
-
-                // Tavsif
-                val descToShow = product.description.trim()
-                if (descToShow.isNotBlank() && descToShow != "-" && descToShow != product.name.trim()) {
-                    Column {
-                        Text("Tavsifi", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = DalliText)
-                        Spacer(Modifier.height(7.dp))
-                        Text(
-                            text = descToShow,
-                            fontSize = 13.5.sp,
-                            color = DalliMuted,
-                            lineHeight = 22.sp
+                    if (product.country.isNotBlank()) {
+                        InfoChip(
+                            icon = Lucide.Globe,
+                            value = product.country,
+                            label = "Ishlab chiqarilgan",
+                            tone = DalliPrimary
+                        )
+                    } else {
+                        InfoChip(
+                            icon = Lucide.CircleCheck,
+                            value = "Mavjud",
+                            label = "Omborda",
+                            tone = DalliSuccess
                         )
                     }
+                }
+
+                // Xususiyatlar — admin tanlagan rang / o'lcham / xotira va h.k.
+                if (product.attributes.isNotEmpty()) {
+                    AttributesSection(attributes = product.attributes)
+                }
+
+                // Tavsifnoma — barcha texnik ma'lumotlar jadvali
+                val specs = product.specifications
+                if (specs.isNotEmpty()) {
+                    SpecificationsSection(specs = specs)
+                }
+
+                // Tavsif — uzun bo'lsa yig'ib ko'rsatiladi (progressive disclosure)
+                val descToShow = product.description.trim()
+                if (descToShow.isNotBlank() && descToShow != "-" && descToShow != product.name.trim()) {
+                    DescriptionSection(text = descToShow)
                 }
 
                 // O'xshash tovarlar
@@ -706,6 +740,194 @@ private fun RoundBtn(
 }
 
 /** Yetkazish / ombor / kategoriya kabi info chip */
+/** Bo'lim sarlavhasi — barcha bo'limlarda bir xil ierarxiya. */
+@Composable
+private fun SectionTitle(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text = text,
+        modifier = modifier,
+        fontSize = 16.sp,
+        fontWeight = FontWeight.ExtraBold,
+        color = DalliText,
+        letterSpacing = (-0.2).sp
+    )
+}
+
+/**
+ * Xususiyatlar bo'limi. "Rang" uchun rang doirasi ko'rsatiladi, qolganlari
+ * oddiy chip. Ma'no faqat rang orqali berilmaydi — nomi ham doim yoziladi.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AttributesSection(attributes: Map<String, List<String>>) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        SectionTitle("Xususiyatlar")
+        attributes.forEach { (nom, qiymatlar) ->
+            if (qiymatlar.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Text(
+                        text = nom,
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = DalliMuted
+                    )
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        qiymatlar.forEach { qiymat ->
+                            AttributeChip(name = nom, value = qiymat)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AttributeChip(name: String, value: String) {
+    val swatch = if (name.equals("Rang", ignoreCase = true)) colorSwatchFor(value) else null
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(DalliSurface)
+            .border(1.dp, DalliLine, RoundedCornerShape(10.dp))
+            .padding(horizontal = 12.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        if (swatch != null) {
+            Box(
+                modifier = Modifier
+                    .size(16.dp)
+                    .clip(CircleShape)
+                    .background(swatch)
+                    .border(1.dp, DalliLine2, CircleShape)
+            )
+        }
+        Text(
+            text = value,
+            fontSize = 13.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = DalliTextSecondary
+        )
+    }
+}
+
+/** Saytdagi rang nomlarini ko'rsatish uchun rangga o'giradi. */
+private fun colorSwatchFor(name: String): Color? = when (name.trim().lowercase()) {
+    "alvon" -> Color(0xFFE03C31)
+    "ametist" -> Color(0xFF9966CC)
+    "to'q qizil" -> Color(0xFF8B0000)
+    "sarg'ish" -> Color(0xFFF5DEB3)
+    "sarg'ish melanj" -> Color(0xFFD2B48C)
+    "oq" -> Color(0xFFFFFFFF)
+    "moviy" -> Color(0xFF4169E1)
+    "xantal" -> Color(0xFFFFDB58)
+    "sariq" -> Color(0xFFFFFF00)
+    "yashil" -> Color(0xFF008000)
+    "yashil xaki" -> Color(0xFF556B2F)
+    "tilla xaki" -> Color(0xFFBDB76B)
+    "tilla" -> Color(0xFFFFD700)
+    "indigo" -> Color(0xFF4B0082)
+    "qora" -> Color(0xFF000000)
+    "kulrang" -> Color(0xFF808080)
+    "qizil" -> Color(0xFFFF0000)
+    "pushti" -> Color(0xFFFFC0CB)
+    "jigarrang" -> Color(0xFFA52A2A)
+    "binafsha" -> Color(0xFF800080)
+    "havorang" -> Color(0xFF87CEEB)
+    else -> null
+}
+
+/** Tavsifnoma jadvali — nom / qiymat qatorlari, orasida ajratgich. */
+@Composable
+private fun SpecificationsSection(specs: List<Pair<String, String>>) {
+    Column(verticalArrangement = Arrangement.spacedBy(11.dp)) {
+        SectionTitle("Tavsifnoma")
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(DalliSurface)
+                .border(1.dp, DalliLine, RoundedCornerShape(16.dp))
+        ) {
+            specs.forEachIndexed { index, (nom, qiymat) ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 15.dp, vertical = 13.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Text(
+                        text = nom,
+                        modifier = Modifier.weight(1f),
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = DalliMuted
+                    )
+                    Spacer(Modifier.width(16.dp))
+                    Text(
+                        text = qiymat,
+                        modifier = Modifier.weight(1.3f),
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = DalliText,
+                        textAlign = TextAlign.End,
+                        lineHeight = 20.sp
+                    )
+                }
+                if (index != specs.lastIndex) {
+                    HorizontalDivider(color = DalliLine, thickness = 1.dp)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Tavsif. 4 qatordan uzun bo'lsa yig'iladi va "Batafsil" tugmasi chiqadi —
+ * tugma balandligi 44dp dan kam emas.
+ */
+@Composable
+private fun DescriptionSection(text: String) {
+    var expanded by remember(text) { mutableStateOf(false) }
+    var overflows by remember(text) { mutableStateOf(false) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        SectionTitle("Tavsifi")
+        Text(
+            text = text,
+            fontSize = 14.5.sp,
+            color = DalliTextSecondary,
+            lineHeight = 23.sp,
+            maxLines = if (expanded) Int.MAX_VALUE else 4,
+            overflow = TextOverflow.Ellipsis,
+            onTextLayout = { result ->
+                if (!expanded) overflows = result.hasVisualOverflow
+            }
+        )
+        if (overflows || expanded) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { expanded = !expanded }
+                    .heightIn(min = 44.dp)
+                    .padding(vertical = 12.dp),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                Text(
+                    text = if (expanded) "Yig'ish" else "Batafsil",
+                    fontSize = 13.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = DalliPrimary
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun RowScope.InfoChip(
     icon: ImageVector,

@@ -15,6 +15,7 @@ echo "=== 2. Fayllarni serverga ko'chirish ==="
 ssh $SERVER "mkdir -p /opt/xitoy_webapp/backend /opt/xitoy_webapp/frontend"
 scp -r frontend/dist              $SERVER:/opt/xitoy_webapp/frontend/
 scp    backend/main.py            $SERVER:/opt/xitoy_webapp/backend/
+scp    backend/categories.py      $SERVER:/opt/xitoy_webapp/backend/
 scp    backend/requirements.txt   $SERVER:/opt/xitoy_webapp/backend/
 # Eslatma: .env serverda qo'lda boshqariladi (LOGIN_BOT_TOKEN ni o'sha yerda to'ldiring).
 # Birinchi marta:  scp backend/.env.example $SERVER:/opt/xitoy_webapp/backend/.env
