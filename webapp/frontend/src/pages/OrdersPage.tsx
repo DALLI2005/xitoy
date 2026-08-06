@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { RefreshCw, Search, ExternalLink } from 'lucide-react'
+import { RefreshCw, Search, ExternalLink, Package } from 'lucide-react'
 import { api } from '../api'
 import type { Order } from '../types'
 
@@ -48,6 +48,7 @@ function groupSom(n: number): string {
 
 function StatusBadge({
   holat,
+  orderId,
   onSelect,
   loading,
 }: {
@@ -87,8 +88,8 @@ function StatusBadge({
             position: 'fixed',
             top: pos.top,
             right: pos.right,
-            background: '#18181b',
-            border: '1px solid rgba(255,255,255,0.12)',
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
             borderRadius: 12,
             overflow: 'hidden',
             zIndex: 9999,
@@ -116,6 +117,7 @@ function StatusBadge({
                   border: 'none',
                   textAlign: 'left',
                 }}
+                className="hover:bg-white/5 transition-colors"
               >
                 <span
                   style={{
@@ -142,7 +144,7 @@ function StatusBadge({
           color: info.color,
           border: `1px solid ${info.color}55`,
           borderRadius: 8,
-          padding: '4px 10px',
+          padding: '6px 12px',
           fontSize: 12,
           fontWeight: 600,
           cursor: loading ? 'not-allowed' : 'pointer',
@@ -150,14 +152,30 @@ function StatusBadge({
           whiteSpace: 'nowrap',
           display: 'flex',
           alignItems: 'center',
-          gap: 4,
+          gap: 6,
         }}
+        className="transition-transform active:scale-95"
       >
+        {loading ? <RefreshCw size={14} className="animate-spin" /> : (
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: info.color }} />
+        )}
         {info.label}
-        <span style={{ fontSize: 10, opacity: 0.7 }}>▾</span>
+        <span style={{ fontSize: 10, opacity: 0.7, marginLeft: 4 }}>▾</span>
       </button>
       {dropdown}
     </>
+  )
+}
+
+function SkeletonRow() {
+  return (
+    <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
+      <td className="p-4"><div className="skeleton h-5 w-24 rounded mb-2" /><div className="skeleton h-4 w-16 rounded" /></td>
+      <td className="p-4"><div className="skeleton h-5 w-32 rounded mb-2" /><div className="skeleton h-4 w-24 rounded" /></td>
+      <td className="p-4"><div className="skeleton h-10 w-full rounded-lg" /></td>
+      <td className="p-4"><div className="skeleton h-6 w-24 rounded font-bold" /></td>
+      <td className="p-4"><div className="skeleton h-8 w-28 rounded-lg" /></td>
+    </tr>
   )
 }
 
@@ -216,7 +234,7 @@ export default function OrdersPage() {
       return (
         o.order_id.toLowerCase().includes(q) ||
         o.phone.includes(q) ||
-        o.fullname.toLowerCase().includes(q)
+        (o.fullname && o.fullname.toLowerCase().includes(q))
       )
     }
     return true
@@ -228,262 +246,186 @@ export default function OrdersPage() {
   ]
 
   return (
-    <div style={{ padding: '16px 12px 8px', maxWidth: 600, margin: '0 auto' }}>
+    <div className="px-4 md:px-8 pt-6 pb-12 w-full max-w-[1400px] mx-auto">
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 style={{ color: 'var(--fg)', fontSize: 18, fontWeight: 700, margin: 0 }}>Buyurtmalar</h1>
-          {!loading && (
-            <p style={{ color: 'var(--fg-muted)', fontSize: 12, margin: '2px 0 0' }}>
-              Jami: {orders.length} ta
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--fg)' }}>Buyurtmalar</h1>
+          {!loading && !error && (
+            <p className="text-sm mt-1" style={{ color: 'var(--fg-muted)' }}>
+              Jami {orders.length} ta buyurtma
             </p>
           )}
         </div>
-        <button
-          onClick={loadOrders}
-          disabled={loading}
-          style={{
-            background: 'var(--surface)',
-            border: '1px solid var(--border)',
-            borderRadius: 10,
-            padding: '8px 12px',
-            color: loading ? 'var(--fg-muted)' : 'var(--accent)',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            fontSize: 13,
-            fontWeight: 600,
-          }}
-        >
-          <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
-          Yangilash
-        </button>
-      </div>
-
-      {/* Search */}
-      <div style={{ position: 'relative', marginBottom: 12 }}>
-        <Search
-          size={14}
-          style={{
-            position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
-            color: 'var(--fg-muted)',
-          }}
-        />
-        <input
-          className="field"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="ID, ism yoki telefon..."
-          style={{ paddingLeft: 34, width: '100%', boxSizing: 'border-box' }}
-        />
+        <div className="flex gap-3 w-full md:w-auto">
+          <div className="relative flex-1 md:w-64">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+            <input 
+              type="text" 
+              placeholder="ID, ism yoki telefon..." 
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 rounded-xl text-sm"
+              style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--fg)' }}
+            />
+          </div>
+          <button
+            onClick={loadOrders}
+            disabled={loading}
+            className="w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer transition-all hover:brightness-110 active:scale-95 flex-shrink-0"
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--fg)' }}
+            aria-label="Yangilash"
+          >
+            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+          </button>
+        </div>
       </div>
 
       {/* Filter tabs */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 6,
-          overflowX: 'auto',
-          marginBottom: 16,
-          paddingBottom: 4,
-          scrollbarWidth: 'none',
-        }}
-      >
-        {FILTERS.map(f => {
-          const active = filter === f.key
-          const si = f.key === 'all' ? null : STATUS_INFO[f.key]
-          return (
-            <button
-              key={f.key}
-              onClick={() => setFilter(f.key)}
-              style={{
-                flexShrink: 0,
-                padding: '5px 11px',
-                borderRadius: 8,
-                fontSize: 12,
-                fontWeight: active ? 700 : 500,
-                cursor: 'pointer',
-                border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
-                background: active
-                  ? 'rgba(99,102,241,0.15)'
-                  : 'var(--surface)',
-                color: active
-                  ? 'var(--accent-hover)'
-                  : si
-                    ? si.color
-                    : 'var(--fg-muted)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 5,
-              }}
-            >
-              {f.label}
-              {f.count > 0 && (
-                <span
-                  style={{
-                    background: active ? 'rgba(99,102,241,0.3)' : 'var(--border)',
-                    borderRadius: 10,
-                    padding: '1px 6px',
-                    fontSize: 10,
-                    fontWeight: 700,
-                    color: active ? 'var(--accent-hover)' : 'var(--fg-muted)',
-                  }}
-                >
-                  {f.count}
-                </span>
-              )}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* States */}
-      {loading && (
-        <div style={{ textAlign: 'center', padding: '48px 0' }}>
-          <div
-            style={{
-              width: 32, height: 32, borderRadius: '50%',
-              border: '2px solid var(--border)',
-              borderTopColor: 'var(--accent)',
-              animation: 'spin 0.8s linear infinite',
-              margin: '0 auto 12px',
-            }}
-          />
-          <p style={{ color: 'var(--fg-muted)', fontSize: 13 }}>Yuklanmoqda…</p>
-        </div>
-      )}
-
-      {!loading && error && (
-        <div className="glass" style={{ padding: 20, textAlign: 'center', borderColor: 'rgba(239,68,68,0.2)' }}>
-          <p style={{ color: '#ef4444', fontSize: 13, marginBottom: 12 }}>{error}</p>
-          <button
-            onClick={loadOrders}
-            style={{
-              background: 'rgba(99,102,241,0.15)', color: 'var(--accent-hover)',
-              border: '1px solid var(--accent)', borderRadius: 8,
-              padding: '8px 16px', fontSize: 13, cursor: 'pointer',
-            }}
-          >
-            Qayta urinish
-          </button>
-        </div>
-      )}
-
-      {!loading && !error && filtered.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '48px 0' }}>
-          <p style={{ color: 'var(--fg-muted)', fontSize: 14 }}>
-            {search ? 'Natija topilmadi' : "Buyurtmalar yo'q"}
-          </p>
-        </div>
-      )}
-
-      {/* Order cards */}
       {!loading && !error && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {filtered.map(order => (
-            <div
-              key={order.order_id}
-              className="glass"
-              style={{ padding: '14px 16px', borderRadius: 14 }}
-            >
-              {/* Top row */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-                <div>
-                  <span style={{ color: 'var(--fg)', fontWeight: 700, fontSize: 14 }}>
-                    {order.order_id}
-                  </span>
-                  <p style={{ color: 'var(--fg-muted)', fontSize: 11, margin: '2px 0 0' }}>
-                    {formatDate(order.sana)}
-                  </p>
-                </div>
-                <StatusBadge
-                  holat={order.holat}
-                  orderId={order.order_id}
-                  onSelect={s => changeStatus(order.order_id, s)}
-                  loading={updating === order.order_id}
-                />
-              </div>
-
-              {/* Details */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 10 }}>
-                <Row label="Mijoz" value={order.fullname || '—'} />
-                <Row label="Tel" value={order.phone || '—'} />
-                {order.location_link && order.location_link.startsWith('http') ? (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: 'var(--fg-muted)', fontSize: 12 }}>Manzil</span>
-                    <a
-                      href={order.location_link}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{ color: 'var(--accent-hover)', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}
-                    >
-                      Xaritada ko'rish <ExternalLink size={11} />
-                    </a>
-                  </div>
-                ) : order.location_link ? (
-                  <Row label="Manzil" value={order.location_link} />
-                ) : null}
-              </div>
-
-              {/* Products */}
-              <div
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
+          {FILTERS.map(f => {
+            const active = filter === f.key
+            const si = f.key === 'all' ? null : STATUS_INFO[f.key]
+            return (
+              <button
+                key={f.key}
+                onClick={() => setFilter(f.key)}
+                className="flex-shrink-0 text-sm font-semibold px-4 py-2 rounded-xl cursor-pointer transition-all duration-200 flex items-center gap-2"
                 style={{
-                  background: 'rgba(255,255,255,0.03)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 8,
-                  padding: '8px 10px',
-                  marginBottom: 10,
+                  background: active ? 'rgba(99,102,241,0.15)' : 'var(--surface)',
+                  color: active ? '#818cf8' : si ? si.color : 'var(--fg-muted)',
+                  border: `1px solid ${active ? 'rgba(99,102,241,0.3)' : 'var(--border)'}`,
                 }}
               >
-                <p style={{ color: 'var(--fg-muted)', fontSize: 11, marginBottom: 4, fontWeight: 600 }}>
-                  MAHSULOTLAR
-                </p>
-                <p style={{ color: 'var(--fg)', fontSize: 12, lineHeight: 1.5, whiteSpace: 'pre-line' }}>
-                  {order.mahsulotlar}
-                </p>
-              </div>
+                {f.label}
+                {f.count > 0 && (
+                  <span
+                    className="px-2 py-0.5 rounded-full text-xs font-bold"
+                    style={{
+                      background: active ? 'rgba(99,102,241,0.3)' : 'var(--border)',
+                      color: active ? '#818cf8' : 'var(--fg-muted)',
+                    }}
+                  >
+                    {f.count}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
-              {/* Total */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <span style={{ color: 'var(--fg)', fontWeight: 700, fontSize: 14 }}>
-                  {groupSom(order.jami_summa)} so'm
-                </span>
-              </div>
-            </div>
-          ))}
+      {/* Error */}
+      {error && (
+        <div className="p-4 rounded-xl mb-6 flex items-center gap-3" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
+          <span className="text-sm text-red-400 font-medium">{error}</span>
+          <button onClick={loadOrders} className="ml-auto text-sm text-red-400 font-bold hover:underline">Qayta urinish</button>
+        </div>
+      )}
+
+      {/* Empty */}
+      {!loading && !error && filtered.length === 0 && (
+        <div className="glass flex flex-col items-center justify-center py-20 text-center rounded-2xl">
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)' }}>
+            <Package size={28} style={{ color: 'var(--accent)' }} />
+          </div>
+          <p className="text-lg font-semibold" style={{ color: 'var(--fg)' }}>{search ? "Natija topilmadi" : "Buyurtmalar yo'q"}</p>
+        </div>
+      )}
+
+      {/* Table */}
+      {(loading || (!error && filtered.length > 0)) && (
+        <div className="w-full overflow-x-auto rounded-2xl border" style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}>
+          <table className="w-full text-left text-sm whitespace-nowrap" style={{ color: 'var(--fg)' }}>
+            <thead>
+              <tr className="border-b bg-black/20" style={{ borderColor: 'var(--border)' }}>
+                <th className="p-4 font-semibold text-xs uppercase tracking-wider" style={{ color: 'var(--fg-muted)' }}>ID & Sana</th>
+                <th className="p-4 font-semibold text-xs uppercase tracking-wider" style={{ color: 'var(--fg-muted)' }}>Mijoz & Manzil</th>
+                <th className="p-4 font-semibold text-xs uppercase tracking-wider" style={{ color: 'var(--fg-muted)' }}>Mahsulotlar</th>
+                <th className="p-4 font-semibold text-xs uppercase tracking-wider text-right" style={{ color: 'var(--fg-muted)' }}>Jami Summa</th>
+                <th className="p-4 font-semibold text-xs uppercase tracking-wider text-center" style={{ color: 'var(--fg-muted)' }}>Holat</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <>
+                  <SkeletonRow />
+                  <SkeletonRow />
+                  <SkeletonRow />
+                  <SkeletonRow />
+                </>
+              ) : (
+                filtered.map(order => (
+                  <tr 
+                    key={order.order_id} 
+                    className="border-b transition-colors hover:bg-white/5" 
+                    style={{ borderColor: 'var(--border)' }}
+                  >
+                    <td className="p-4 align-top">
+                      <p className="font-bold text-sm" style={{ color: 'var(--fg)' }}>{order.order_id}</p>
+                      <p className="text-xs mt-1" style={{ color: 'var(--fg-muted)' }}>{formatDate(order.sana)}</p>
+                    </td>
+                    <td className="p-4 align-top">
+                      <p className="font-semibold text-sm" style={{ color: 'var(--fg)' }}>{order.fullname || 'Ismi yo\'q'}</p>
+                      <p className="text-xs mt-1 font-mono" style={{ color: 'var(--fg-muted)' }}>{order.phone || '—'}</p>
+                      {order.location_link && (
+                        <div className="mt-2">
+                          {order.location_link.startsWith('http') ? (
+                            <a
+                              href={order.location_link}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1.5 text-xs font-medium hover:underline transition-colors"
+                              style={{ color: '#818cf8', background: 'rgba(99,102,241,0.1)', padding: '4px 8px', borderRadius: '6px' }}
+                            >
+                              Xaritada ko'rish <ExternalLink size={12} />
+                            </a>
+                          ) : (
+                            <p className="text-xs" style={{ color: 'var(--fg-muted)', whiteSpace: 'normal', maxWidth: '200px' }}>
+                              {order.location_link}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    <td className="p-4 align-top max-w-[300px]">
+                      <div className="rounded-lg p-2.5 text-xs whitespace-pre-wrap leading-relaxed" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', color: 'var(--fg)' }}>
+                        {order.mahsulotlar}
+                      </div>
+                    </td>
+                    <td className="p-4 align-top text-right">
+                      <span className="font-bold text-sm" style={{ color: 'var(--accent-hover)' }}>
+                        {groupSom(order.jami_summa)} so'm
+                      </span>
+                    </td>
+                    <td className="p-4 align-top text-center">
+                      <div className="flex justify-center">
+                        <StatusBadge
+                          holat={order.holat}
+                          orderId={order.order_id}
+                          onSelect={s => changeStatus(order.order_id, s)}
+                          loading={updating === order.order_id}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       )}
 
       {/* Toast */}
       {toast && (
         <div
-          style={{
-            position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)',
-            background: '#ef4444', color: '#fff',
-            padding: '10px 20px', borderRadius: 10,
-            fontSize: 13, fontWeight: 600,
-            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-            zIndex: 999,
-          }}
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-xl text-sm font-bold shadow-2xl z-[9999]"
+          style={{ background: '#ef4444', color: '#fff', boxShadow: '0 8px 32px rgba(239,68,68,0.4)' }}
         >
           {toast}
         </div>
       )}
-
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg) } }
-        input::-webkit-search-cancel-button { display: none }
-      `}</style>
-    </div>
-  )
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
-      <span style={{ color: 'var(--fg-muted)', fontSize: 12, flexShrink: 0 }}>{label}</span>
-      <span style={{ color: 'var(--fg)', fontSize: 12, textAlign: 'right', wordBreak: 'break-all' }}>{value}</span>
     </div>
   )
 }

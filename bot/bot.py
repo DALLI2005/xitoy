@@ -48,15 +48,16 @@ from telegram.ext import (
     CallbackQueryHandler, filters, ContextTypes
 )
 
-WEBAPP_URL = os.environ.get("WEBAPP_URL", "https://admin.eliboyev.uz")
+WEBAPP_URL = os.environ.get("WEBAPP_URL", "https://admins.eliboyev.uz")
 
 # ── Sozlamalar ────────────────────────────────────────────────────────────────
 
-BOT_TOKEN       = os.environ.get("BOT_TOKEN", "")
-ADMIN_ID        = os.environ.get("SUPERADMIN_ID", "")
-APPS_SCRIPT_URL = os.environ.get("APPS_SCRIPT_URL", "")
-IMGBB_API_KEY   = os.environ.get("IMGBB_API_KEY", "")
-CHANNEL_ID      = os.environ.get("CHANNEL_ID", "")
+BOT_TOKEN          = os.environ.get("BOT_TOKEN", "")
+ADMIN_ID           = os.environ.get("SUPERADMIN_ID", "")
+APPS_SCRIPT_URL    = os.environ.get("APPS_SCRIPT_URL", "")
+APPS_SCRIPT_SECRET = os.environ.get("APPS_SCRIPT_SECRET", "")
+IMGBB_API_KEY      = os.environ.get("IMGBB_API_KEY", "")
+CHANNEL_ID         = os.environ.get("CHANNEL_ID", "")
 
 # Ilova foydalanuvchilari (telefon+parol auth) — backend bilan bir xil DB
 APP_USERS_DB    = "/opt/xitoy_webapp/backend/admins.db"
@@ -165,7 +166,7 @@ def _upload_sync(image_bytes: bytes) -> str:
 
 
 def _post_sync(data: dict) -> dict:
-    payload = json.dumps(data).encode()
+    payload = json.dumps({**data, "secret": APPS_SCRIPT_SECRET}).encode()
     req = urllib.request.Request(
         APPS_SCRIPT_URL, data=payload,
         headers={"Content-Type": "application/json"}
@@ -178,7 +179,8 @@ def _post_sync(data: dict) -> dict:
 
 
 def _get_sync() -> list:
-    with urllib.request.urlopen(APPS_SCRIPT_URL, timeout=15) as resp:
+    query = urllib.parse.urlencode({"secret": APPS_SCRIPT_SECRET})
+    with urllib.request.urlopen(f"{APPS_SCRIPT_URL}?{query}", timeout=15) as resp:
         return json.loads(resp.read())
 
 

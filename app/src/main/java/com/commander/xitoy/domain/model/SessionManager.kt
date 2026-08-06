@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.UUID
 
 // Saqlangan foydalanuvchi sessiyasi
 data class UserSession(
@@ -29,21 +30,33 @@ object SessionManager {
     private const val KEY_PHONE = "phone"
     private const val KEY_ADDRESS = "address"
     private const val KEY_TOKEN = "token"
+    private const val KEY_GUEST_ID = "guest_id"
 
     private var prefs: SharedPreferences? = null
     private var appContext: Context? = null
 
-    private val guestSession = UserSession(
-        telegramId = "guest_user",
-        ism = "Foydalanuvchi",
-        username = "guest",
-        fullname = "Mehmon",
-        phone = "+998900000000",
-        address = "Rishton",
-        token = "guest_token"
-    )
+    // Har bir qurilma uchun noyob, doimiy mehmon ID — turli qurilmalardagi
+    // mehmon foydalanuvchilarning savati/buyurtmasi/sevimlilari serverda
+    // aralashib ketmasligi uchun (avval hammasi bitta "guest_user" edi).
+    private fun buildGuestSession(): UserSession {
+        val p = prefs
+        var guestId = p?.getString(KEY_GUEST_ID, null)
+        if (guestId == null) {
+            guestId = "guest_" + UUID.randomUUID().toString()
+            p?.edit()?.putString(KEY_GUEST_ID, guestId)?.apply()
+        }
+        return UserSession(
+            telegramId = guestId,
+            ism = "Foydalanuvchi",
+            username = "guest",
+            fullname = "Mehmon",
+            phone = "+998900000000",
+            address = "Rishton",
+            token = "guest_token"
+        )
+    }
 
-    private val _session = MutableStateFlow<UserSession?>(guestSession)
+    private val _session = MutableStateFlow<UserSession?>(null)
     val session: StateFlow<UserSession?> = _session.asStateFlow()
 
     fun init(context: Context) {
@@ -62,7 +75,7 @@ object SessionManager {
             )
         } else {
             // Login/ro'yxatdan o'tish vaqtincha o'chirilgan — avtomatik mehmon seansi
-            _session.value = guestSession
+            _session.value = buildGuestSession()
         }
     }
 
@@ -101,7 +114,9 @@ object SessionManager {
     }
 
     fun logout() {
+        val guestId = prefs?.getString(KEY_GUEST_ID, null)
         prefs?.edit()?.clear()?.apply()
-        _session.value = guestSession
+        guestId?.let { prefs?.edit()?.putString(KEY_GUEST_ID, it)?.apply() }
+        _session.value = buildGuestSession()
     }
 }

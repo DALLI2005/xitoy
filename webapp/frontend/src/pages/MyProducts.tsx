@@ -1,23 +1,21 @@
 import { useEffect, useState } from 'react'
-import { Package, RefreshCw, Pencil, Trash2, X, Check } from 'lucide-react'
+import { Package, RefreshCw, Pencil, Trash2, X, Check, Search } from 'lucide-react'
 import { api } from '../api'
 import type { Product, User } from '../types'
 
 interface Props { user: User }
 
-function SkeletonCard() {
+function SkeletonRow() {
   return (
-    <div className="glass p-3 flex gap-3">
-      <div className="skeleton w-16 h-16 rounded-xl flex-shrink-0" />
-      <div className="flex-1 flex flex-col gap-2 pt-1">
-        <div className="skeleton h-4 w-3/4 rounded" />
-        <div className="skeleton h-4 w-1/2 rounded" />
-        <div className="flex gap-2 mt-1">
-          <div className="skeleton h-5 w-16 rounded-full" />
-          <div className="skeleton h-5 w-10 rounded-full" />
-        </div>
-      </div>
-    </div>
+    <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
+      <td className="p-3"><div className="skeleton w-12 h-12 rounded-lg" /></td>
+      <td className="p-3"><div className="skeleton h-4 w-3/4 rounded mb-2" /><div className="skeleton h-3 w-1/2 rounded" /></td>
+      <td className="p-3"><div className="skeleton h-5 w-20 rounded-full" /></td>
+      <td className="p-3"><div className="skeleton h-4 w-16 rounded" /></td>
+      <td className="p-3"><div className="skeleton h-6 w-16 rounded-full" /></td>
+      <td className="p-3"><div className="skeleton h-6 w-16 rounded-full" /></td>
+      <td className="p-3"><div className="skeleton h-8 w-20 rounded-lg" /></td>
+    </tr>
   )
 }
 
@@ -55,6 +53,7 @@ export default function MyProducts({ user }: Props) {
   const [error, setError]       = useState('')
   const [toggling, setToggling] = useState<string>('')  // "id:field"
   const [filter, setFilter]     = useState<Filter>('all')
+  const [search, setSearch]     = useState('')
 
   // Edit modal
   const [editProduct, setEditProduct] = useState<Product | null>(null)
@@ -207,56 +206,76 @@ export default function MyProducts({ user }: Props) {
     new Intl.NumberFormat('uz-UZ').format(n) + ' so\'m'
 
   const filtered = products.filter(p => {
-    if (filter === 'inactive')   return p.active  === false
-    if (filter === 'outofstock') return p.inStock === false
+    if (filter === 'inactive' && p.active !== false) return false
+    if (filter === 'outofstock' && p.inStock !== false) return false
+    
+    if (search) {
+      const q = search.toLowerCase()
+      const title = (p.title || p.name || '').toLowerCase()
+      if (!title.includes(q)) return false
+    }
     return true
   })
 
   const filterLabels: { key: Filter; label: string; count?: number }[] = [
     { key: 'all',        label: 'Barcha',   count: products.length },
-    { key: 'inactive',   label: '🔴 Nofaol', count: products.filter(p => p.active === false).length },
-    { key: 'outofstock', label: '⚠️ Tugagan', count: products.filter(p => p.inStock === false).length },
+    { key: 'inactive',   label: 'Nofaol', count: products.filter(p => p.active === false).length },
+    { key: 'outofstock', label: 'Tugagan', count: products.filter(p => p.inStock === false).length },
   ]
 
   return (
-    <div className="px-4 pt-5 pb-6">
-      <div className="flex items-center justify-between mb-4">
+    <div className="px-4 md:px-8 pt-6 pb-12 w-full max-w-[1400px] mx-auto">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-lg font-semibold" style={{ color: 'var(--fg)' }}>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--fg)' }}>
             {user.is_superadmin ? 'Barcha tovarlar' : 'Tovarlarim'}
           </h1>
           {!loading && !error && (
-            <p className="text-sm mt-0.5" style={{ color: 'var(--fg-muted)' }}>
-              {filtered.length} ta tovar
+            <p className="text-sm mt-1" style={{ color: 'var(--fg-muted)' }}>
+              Jami {filtered.length} ta tovar
             </p>
           )}
         </div>
-        <button
-          onClick={load}
-          disabled={loading}
-          className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer transition-all duration-200 active:scale-90"
-          style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--fg-muted)' }}
-          aria-label="Yangilash"
-        >
-          <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
-        </button>
+        <div className="flex gap-3 w-full md:w-auto">
+          <div className="relative flex-1 md:w-64">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+            <input 
+              type="text" 
+              placeholder="Tovar nomi bo'yicha qidiruv..." 
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 rounded-xl text-sm"
+              style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--fg)' }}
+            />
+          </div>
+          <button
+            onClick={load}
+            disabled={loading}
+            className="w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer transition-all hover:brightness-110 active:scale-95 flex-shrink-0"
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--fg)' }}
+            aria-label="Yangilash"
+          >
+            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+          </button>
+        </div>
       </div>
 
-      {/* Filter tabs — faqat superadmin uchun */}
+      {/* Filter tabs */}
       {user.is_superadmin && !loading && !error && (
-        <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide">
           {filterLabels.map(({ key, label, count }) => (
             <button
               key={key}
               onClick={() => setFilter(key)}
-              className="flex-shrink-0 text-xs font-medium px-3 py-1.5 rounded-full cursor-pointer transition-all duration-150"
+              className="flex-shrink-0 text-sm font-semibold px-4 py-2 rounded-xl cursor-pointer transition-all duration-200"
               style={{
-                background: filter === key ? 'rgba(99,102,241,0.2)' : 'var(--surface)',
-                color:      filter === key ? 'var(--accent-hover)' : 'var(--fg-muted)',
-                border:     `1px solid ${filter === key ? 'rgba(99,102,241,0.35)' : 'var(--border)'}`,
+                background: filter === key ? 'rgba(99,102,241,0.15)' : 'var(--surface)',
+                color:      filter === key ? '#818cf8' : 'var(--fg-muted)',
+                border:     `1px solid ${filter === key ? 'rgba(99,102,241,0.3)' : 'var(--border)'}`,
               }}
             >
-              {label} {count !== undefined && <span style={{ opacity: 0.7 }}>({count})</span>}
+              {label} {count !== undefined && <span className="ml-1.5 px-2 py-0.5 rounded-full text-xs" style={{ background: filter === key ? 'rgba(99,102,241,0.2)' : 'var(--border)', color: filter === key ? '#818cf8' : 'var(--fg-muted)' }}>{count}</span>}
             </button>
           ))}
         </div>
@@ -264,80 +283,168 @@ export default function MyProducts({ user }: Props) {
 
       {/* Error */}
       {error && (
-        <div
-          className="glass p-4 mb-4 flex items-center gap-3"
-          style={{ borderColor: 'rgba(239,68,68,0.3)' }}
-        >
-          <span className="text-sm" style={{ color: 'var(--error)' }}>{error}</span>
-          <button
-            onClick={load}
-            className="ml-auto text-xs font-medium cursor-pointer"
-            style={{ color: 'var(--accent)' }}
-          >
-            Qayta
-          </button>
-        </div>
-      )}
-
-      {/* Skeleton */}
-      {loading && (
-        <div className="flex flex-col gap-3">
-          {[0,1,2].map(i => <SkeletonCard key={i} />)}
+        <div className="p-4 rounded-xl mb-6 flex items-center gap-3" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
+          <span className="text-sm text-red-400 font-medium">{error}</span>
+          <button onClick={load} className="ml-auto text-sm text-red-400 font-bold hover:underline">Qayta urinish</button>
         </div>
       )}
 
       {/* Empty */}
       {!loading && !error && filtered.length === 0 && (
-        <div className="glass flex flex-col items-center justify-center py-16 text-center">
-          <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
-            style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)' }}
-          >
-            <Package size={24} style={{ color: 'var(--accent)' }} />
+        <div className="glass flex flex-col items-center justify-center py-20 text-center rounded-2xl">
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4" style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)' }}>
+            <Package size={28} style={{ color: 'var(--accent)' }} />
           </div>
-          <p className="font-medium" style={{ color: 'var(--fg)' }}>
-            {filter === 'all' ? 'Hozircha tovar yo\'q' : 'Bunday tovar topilmadi'}
-          </p>
-          <p className="text-sm mt-1" style={{ color: 'var(--fg-muted)' }}>
-            {filter === 'all' ? 'Yangi tovar qo\'shing' : 'Filter o\'zgartiring'}
-          </p>
+          <p className="text-lg font-semibold" style={{ color: 'var(--fg)' }}>{filter === 'all' && !search ? "Tovarlar yo'q" : "Hech narsa topilmadi"}</p>
+          <p className="text-sm mt-1" style={{ color: 'var(--fg-muted)' }}>{filter === 'all' && !search ? "Yangi tovar qo'shing" : "Qidiruv yoki filterni o'zgartirib ko'ring"}</p>
+        </div>
+      )}
+
+      {/* Table */}
+      {(loading || (!error && filtered.length > 0)) && (
+        <div className="w-full overflow-x-auto rounded-2xl border" style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}>
+          <table className="w-full text-left text-sm whitespace-nowrap" style={{ color: 'var(--fg)' }}>
+            <thead>
+              <tr className="border-b bg-black/20" style={{ borderColor: 'var(--border)' }}>
+                <th className="p-4 font-semibold text-xs uppercase tracking-wider" style={{ color: 'var(--fg-muted)' }}>Rasm</th>
+                <th className="p-4 font-semibold text-xs uppercase tracking-wider" style={{ color: 'var(--fg-muted)' }}>Tovar nomi & ID</th>
+                <th className="p-4 font-semibold text-xs uppercase tracking-wider" style={{ color: 'var(--fg-muted)' }}>Kategoriya</th>
+                <th className="p-4 font-semibold text-xs uppercase tracking-wider" style={{ color: 'var(--fg-muted)' }}>Narx</th>
+                <th className="p-4 font-semibold text-xs uppercase tracking-wider text-center" style={{ color: 'var(--fg-muted)' }}>Zaxira</th>
+                <th className="p-4 font-semibold text-xs uppercase tracking-wider text-center" style={{ color: 'var(--fg-muted)' }}>Status</th>
+                {user.is_superadmin && <th className="p-4 font-semibold text-xs uppercase tracking-wider text-right" style={{ color: 'var(--fg-muted)' }}>Amallar</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <>
+                  <SkeletonRow />
+                  <SkeletonRow />
+                  <SkeletonRow />
+                  <SkeletonRow />
+                </>
+              ) : (
+                filtered.map((p, i) => {
+                  const id       = p.id ?? i
+                  const name     = p.title || p.name || '—'
+                  const imgUrl   = p.image_url || p.imageUrl
+                  const discount = p.discountPercent || p.discount || 0
+                  const cat      = p.category || 'Boshqa'
+                  const active   = p.active  !== false
+                  const inStock  = p.inStock !== false
+
+                  return (
+                    <tr 
+                      key={id} 
+                      className="border-b transition-colors hover:bg-white/5" 
+                      style={{ borderColor: 'var(--border)', opacity: active ? 1 : 0.6 }}
+                    >
+                      <td className="p-4">
+                        {imgUrl ? (
+                          <img src={imgUrl} alt={name} loading="lazy" className="w-12 h-12 rounded-lg object-cover border" style={{ borderColor: 'var(--border)' }} />
+                        ) : (
+                          <div className="w-12 h-12 rounded-lg flex items-center justify-center bg-indigo-500/10 border" style={{ borderColor: 'var(--border)' }}>
+                            <Package size={18} className="text-indigo-400" />
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-4 max-w-[200px] md:max-w-[300px]">
+                        <p className="font-semibold truncate text-sm" style={{ color: 'var(--fg)' }} title={name}>{name}</p>
+                        <p className="text-xs mt-1 font-mono" style={{ color: 'var(--fg-muted)' }}>#{id}</p>
+                      </td>
+                      <td className="p-4">
+                        <span className="text-xs px-2.5 py-1 rounded-md font-semibold" style={{ background: CAT_COLORS[cat] || CAT_COLORS['Boshqa'], color: CAT_TEXT[cat] || CAT_TEXT['Boshqa'] }}>
+                          {cat}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex flex-col gap-1">
+                          <span className="font-semibold" style={{ color: 'var(--accent-hover)' }}>{fmt(p.price)}</span>
+                          {discount > 0 && <span className="text-xs font-medium text-red-400 bg-red-400/10 px-2 py-0.5 rounded-full w-fit">-{discount}% chegirma</span>}
+                        </div>
+                      </td>
+                      <td className="p-4 text-center align-middle">
+                        {user.is_superadmin ? (
+                          <button
+                            disabled={toggling === `${id}:in_stock`}
+                            onClick={() => toggleField(id, 'in_stock', inStock)}
+                            className="inline-flex items-center justify-center text-xs px-3 py-1.5 rounded-full font-bold cursor-pointer transition-all active:scale-95 disabled:opacity-50"
+                            style={{
+                              background: inStock ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
+                              color: inStock ? '#4ade80' : '#f87171',
+                              border: `1px solid ${inStock ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`
+                            }}
+                          >
+                            {toggling === `${id}:in_stock` ? '...' : inStock ? 'Bor' : 'Tugagan'}
+                          </button>
+                        ) : (
+                          <span className="text-xs px-3 py-1.5 rounded-full font-bold inline-block" style={{ background: inStock ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)', color: inStock ? '#4ade80' : '#f87171' }}>
+                            {inStock ? 'Bor' : 'Tugagan'}
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-4 text-center align-middle">
+                        {user.is_superadmin ? (
+                          <button
+                            disabled={toggling === `${id}:active`}
+                            onClick={() => toggleField(id, 'active', active)}
+                            className="inline-flex items-center justify-center text-xs px-3 py-1.5 rounded-full font-bold cursor-pointer transition-all active:scale-95 disabled:opacity-50"
+                            style={{
+                              background: active ? 'rgba(99,102,241,0.15)' : 'var(--bg)',
+                              color: active ? '#818cf8' : 'var(--fg-muted)',
+                              border: `1px solid ${active ? 'rgba(99,102,241,0.3)' : 'var(--border)'}`
+                            }}
+                          >
+                            {toggling === `${id}:active` ? '...' : active ? 'Faol' : 'Nofaol'}
+                          </button>
+                        ) : (
+                          <span className="text-xs px-3 py-1.5 rounded-full font-bold inline-block" style={{ background: active ? 'rgba(99,102,241,0.15)' : 'var(--bg)', color: active ? '#818cf8' : 'var(--fg-muted)' }}>
+                            {active ? 'Faol' : 'Nofaol'}
+                          </span>
+                        )}
+                      </td>
+                      {user.is_superadmin && (
+                        <td className="p-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => openEdit(p)}
+                              className="p-2 rounded-lg cursor-pointer transition-colors hover:bg-indigo-500/20 text-indigo-400"
+                              title="Tahrirlash"
+                            >
+                              <Pencil size={16} />
+                            </button>
+                            <button
+                              onClick={() => setDeleteId(id)}
+                              className="p-2 rounded-lg cursor-pointer transition-colors hover:bg-red-500/20 text-red-400"
+                              title="O'chirish"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       )}
 
       {/* ── Delete confirm modal ── */}
       {deleteId != null && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center px-6"
-          style={{ background: 'rgba(0,0,0,0.6)' }}
-          onClick={() => !deleting && setDeleteId(null)}
-        >
-          <div
-            className="w-full max-w-sm rounded-2xl p-6 flex flex-col gap-4"
-            style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
-            onClick={e => e.stopPropagation()}
-          >
-            <p className="font-semibold text-center text-base" style={{ color: 'var(--fg)' }}>
-              Tovarni o'chirmoqchimisiz?
-            </p>
-            <p className="text-sm text-center" style={{ color: 'var(--fg-muted)' }}>
-              Bu amalni qaytarib bo'lmaydi.
-            </p>
-            <div className="flex gap-3 mt-1">
-              <button
-                onClick={() => setDeleteId(null)}
-                disabled={deleting}
-                className="flex-1 py-2.5 rounded-xl text-sm font-medium cursor-pointer"
-                style={{ background: 'var(--bg)', color: 'var(--fg-muted)', border: '1px solid var(--border)' }}
-              >
-                Bekor
-              </button>
-              <button
-                onClick={confirmDelete}
-                disabled={deleting}
-                className="flex-1 py-2.5 rounded-xl text-sm font-medium cursor-pointer"
-                style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)' }}
-              >
-                {deleting ? '…' : 'O\'chirish'}
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={() => !deleting && setDeleteId(null)}>
+          <div className="w-full max-w-sm rounded-2xl p-6 flex flex-col gap-4 shadow-2xl scale-100" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }} onClick={e => e.stopPropagation()}>
+            <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto" style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171' }}>
+              <Trash2 size={24} />
+            </div>
+            <h3 className="font-bold text-center text-lg" style={{ color: 'var(--fg)' }}>Tovarni o'chirish</h3>
+            <p className="text-sm text-center px-2" style={{ color: 'var(--fg-muted)' }}>Rostdan ham ushbu tovarni o'chirib tashlamoqchimisiz? Bu amalni ortga qaytarib bo'lmaydi.</p>
+            <div className="flex gap-3 mt-2">
+              <button onClick={() => setDeleteId(null)} disabled={deleting} className="flex-1 py-2.5 rounded-xl text-sm font-bold cursor-pointer transition-colors hover:bg-white/5" style={{ background: 'var(--bg)', color: 'var(--fg)', border: '1px solid var(--border)' }}>Bekor qilish</button>
+              <button onClick={confirmDelete} disabled={deleting} className="flex-1 py-2.5 rounded-xl text-sm font-bold cursor-pointer transition-opacity hover:opacity-80 flex justify-center" style={{ background: '#ef4444', color: '#fff' }}>
+                {deleting ? <RefreshCw size={18} className="animate-spin" /> : "O'chirish"}
               </button>
             </div>
           </div>
@@ -346,408 +453,132 @@ export default function MyProducts({ user }: Props) {
 
       {/* ── Edit modal ── */}
       {editProduct && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center"
-          style={{ background: 'rgba(0,0,0,0.55)' }}
-          onClick={() => { if (!editSaving) { setEditProduct(null); setSizesByColor({}) } }}
-        >
-          <div
-            className="w-full max-w-sm rounded-t-3xl p-5 flex flex-col gap-3 overflow-y-auto"
-            style={{ background: 'var(--surface)', border: '1px solid var(--border)', maxHeight: '90vh', paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom, 72px))' }}
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-1">
-              <p className="font-semibold" style={{ color: 'var(--fg)' }}>Tovarni tahrirlash</p>
-              <button onClick={() => { setEditProduct(null); setSizesByColor({}) }} style={{ color: 'var(--fg-muted)' }}>
-                <X size={18} />
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }} onClick={() => { if (!editSaving) { setEditProduct(null); setSizesByColor({}) } }}>
+          <div className="w-full max-w-lg rounded-2xl p-6 flex flex-col gap-5 overflow-y-auto max-h-full shadow-2xl relative" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }} onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between pb-2 border-b" style={{ borderColor: 'var(--border)' }}>
+              <h2 className="text-lg font-bold" style={{ color: 'var(--fg)' }}>Tovarni tahrirlash</h2>
+              <button onClick={() => { setEditProduct(null); setSizesByColor({}) }} className="p-2 rounded-full hover:bg-white/10 transition-colors" style={{ color: 'var(--fg-muted)' }}>
+                <X size={20} />
               </button>
             </div>
 
             {editError && (
-              <p className="text-xs px-3 py-2 rounded-lg" style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171' }}>
-                {editError}
-              </p>
-            )}
-
-            {/* Nom */}
-            <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--fg-muted)' }}>TOVAR NOMI</label>
-              <input
-                className="field"
-                value={editForm.name}
-                onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
-                disabled={editSaving}
-              />
-            </div>
-
-            {/* Narx */}
-            <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--fg-muted)' }}>NARX (SO'M)</label>
-              <input
-                className="field"
-                type="number"
-                inputMode="numeric"
-                value={editForm.price}
-                onChange={e => setEditForm(f => ({ ...f, price: e.target.value }))}
-                disabled={editSaving}
-              />
-            </div>
-
-            {/* Chegirma */}
-            <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--fg-muted)' }}>CHEGIRMA (%)</label>
-              <input
-                className="field"
-                type="number"
-                inputMode="numeric"
-                value={editForm.discount}
-                onChange={e => setEditForm(f => ({ ...f, discount: e.target.value }))}
-                min={0} max={90}
-                disabled={editSaving}
-                style={{ width: 100 }}
-              />
-            </div>
-
-            {/* Kategoriya */}
-            <div>
-              <label className="text-xs font-medium mb-2 block" style={{ color: 'var(--fg-muted)' }}>KATEGORIYA</label>
-              <div className="flex flex-wrap gap-2">
-                {['Kiyim','Elektronika','Poyabzal','Aksessuar','Sport','Uy uchun','Boshqa'].map(cat => (
-                  <button
-                    key={cat}
-                    type="button"
-                    disabled={editSaving}
-                    onClick={() => setEditForm(f => ({ ...f, category: cat }))}
-                    className="chip"
-                    style={editForm.category === cat ? {
-                      background: 'rgba(99,102,241,0.2)',
-                      color: 'var(--accent-hover)',
-                      border: '1px solid rgba(99,102,241,0.4)',
-                    } : {}}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Tavsif */}
-            <div>
-              <label className="text-xs font-medium mb-1 block" style={{ color: 'var(--fg-muted)' }}>TAVSIF</label>
-              <textarea
-                className="field resize-none"
-                value={editForm.description}
-                onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
-                rows={2}
-                disabled={editSaving}
-              />
-            </div>
-
-            {/* Variant toggle */}
-            <div className="flex items-center justify-between py-1">
-              <label className="text-xs font-medium" style={{ color: 'var(--fg-muted)' }}>RASMLAR NARXI FARQ QILADIMI?</label>
-              <button
-                type="button"
-                disabled={editSaving}
-                onClick={() => setEditForm(f => ({
-                  ...f,
-                  variantlar_yoqilgan: !f.variantlar_yoqilgan,
-                  variant_nomlari:  !f.variantlar_yoqilgan && f.variant_nomlari.length === 0 ? [''] : f.variant_nomlari,
-                  variant_narxlari: !f.variantlar_yoqilgan && f.variant_narxlari.length === 0 ? [''] : f.variant_narxlari,
-                }))}
-                className="text-xs px-3 py-1 rounded-lg font-medium cursor-pointer transition-all duration-150"
-                style={{
-                  background: editForm.variantlar_yoqilgan ? 'rgba(99,102,241,0.2)' : 'var(--bg)',
-                  color:      editForm.variantlar_yoqilgan ? 'var(--accent-hover)' : 'var(--fg-muted)',
-                  border:     `1px solid ${editForm.variantlar_yoqilgan ? 'rgba(99,102,241,0.4)' : 'var(--border)'}`,
-                }}
-              >
-                {editForm.variantlar_yoqilgan ? 'Ha ✓' : "Yo'q"}
-              </button>
-            </div>
-
-            {/* Variant qatorlari */}
-            {editForm.variantlar_yoqilgan && (
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-medium" style={{ color: 'var(--fg-muted)' }}>VARIANTLAR (RANG — NARX)</label>
-                {editForm.variant_nomlari.map((nom, idx) => (
-                  <div key={idx} className="flex gap-2 items-center">
-                    <input
-                      className="field flex-1"
-                      placeholder="Rang nomi"
-                      value={nom}
-                      disabled={editSaving}
-                      onChange={e => setEditForm(f => {
-                        const nomlari = [...f.variant_nomlari]
-                        nomlari[idx] = e.target.value
-                        return { ...f, variant_nomlari: nomlari }
-                      })}
-                    />
-                    <input
-                      className="field"
-                      type="number"
-                      inputMode="numeric"
-                      placeholder="Narx"
-                      style={{ width: 90 }}
-                      value={editForm.variant_narxlari[idx] ?? ''}
-                      disabled={editSaving}
-                      onChange={e => setEditForm(f => {
-                        const narxlari = [...f.variant_narxlari]
-                        narxlari[idx] = e.target.value
-                        return { ...f, variant_narxlari: narxlari }
-                      })}
-                    />
-                    <button
-                      type="button"
-                      disabled={editSaving}
-                      onClick={() => setEditForm(f => ({
-                        ...f,
-                        variant_nomlari:  f.variant_nomlari.filter((_, i) => i !== idx),
-                        variant_narxlari: f.variant_narxlari.filter((_, i) => i !== idx),
-                      }))}
-                      className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer flex-shrink-0"
-                      style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}
-                    >
-                      <X size={13} />
-                    </button>
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  disabled={editSaving}
-                  onClick={() => setEditForm(f => ({
-                    ...f,
-                    variant_nomlari:  [...f.variant_nomlari, ''],
-                    variant_narxlari: [...f.variant_narxlari, ''],
-                  }))}
-                  className="text-xs font-medium py-1.5 rounded-lg cursor-pointer"
-                  style={{ background: 'rgba(99,102,241,0.08)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.2)' }}
-                >
-                  + Variant qo'shish
-                </button>
+              <div className="px-4 py-3 rounded-xl flex items-center gap-2" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171' }}>
+                <span className="text-sm font-semibold">{editError}</span>
               </div>
             )}
 
-            {/* Razmer qatorlari — har bir rang uchun */}
-            {editForm.variantlar_yoqilgan && editForm.variant_nomlari.length > 0 && (
-              <div className="flex flex-col gap-3">
-                <label className="text-xs font-medium" style={{ color: 'var(--fg-muted)' }}>RAZMERLAR (RANG BO'YICHA, IXTIYORIY)</label>
-                {editForm.variant_nomlari.map((nom, colorIndex) => (
-                  <div
-                    key={colorIndex}
-                    style={{ paddingLeft: 10, borderLeft: '2px solid var(--border)' }}
-                  >
-                    <p className="text-xs mb-2" style={{ color: 'var(--fg-muted)' }}>
-                      <span style={{ color: 'var(--accent)', fontWeight: 600 }}>
-                        {nom?.trim() || `Rang ${colorIndex + 1}`}
-                      </span>
-                      {' '}uchun razmerlar:
-                    </p>
-                    {(sizesByColor[colorIndex] || []).map((size, sizeIndex) => (
-                      <div key={sizeIndex} className="flex gap-2 mb-2 items-center">
-                        <input
-                          className="field flex-1"
-                          placeholder="Razmer (S, M, L…)"
-                          value={size.nomi}
-                          onChange={e => updateSize(colorIndex, sizeIndex, 'nomi', e.target.value)}
-                          disabled={editSaving}
-                          autoComplete="off"
-                        />
-                        <input
-                          className="field"
-                          type="number"
-                          inputMode="numeric"
-                          placeholder="Narxi"
-                          value={size.narx}
-                          onChange={e => updateSize(colorIndex, sizeIndex, 'narx', e.target.value)}
-                          disabled={editSaving}
-                          style={{ width: 90 }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeSize(colorIndex, sizeIndex)}
-                          disabled={editSaving}
-                          className="w-7 h-7 flex items-center justify-center rounded-lg cursor-pointer flex-shrink-0"
-                          style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)', fontSize: 13 }}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => addSize(colorIndex)}
-                      disabled={editSaving}
-                      className="text-xs font-medium py-1 px-2.5 rounded-lg cursor-pointer"
-                      style={{ background: 'rgba(99,102,241,0.08)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.2)' }}
-                    >
-                      + Razmer qo'shish
-                    </button>
-                  </div>
-                ))}
+            <div className="flex flex-col gap-4">
+              {/* Nom */}
+              <div>
+                <label className="text-xs font-bold mb-1.5 block uppercase tracking-wider" style={{ color: 'var(--fg-muted)' }}>Tovar nomi</label>
+                <input className="field w-full" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} disabled={editSaving} />
               </div>
-            )}
 
-            <button
-              onClick={saveEdit}
-              disabled={editSaving}
-              className="btn-primary mt-1 flex items-center justify-center gap-2"
-            >
-              {editSaving ? '…' : <><Check size={15} /> Saqlash</>}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* List */}
-      {!loading && !error && filtered.length > 0 && (
-        <div className="flex flex-col gap-3">
-          {filtered.map((p, i) => {
-            const id       = p.id ?? i
-            const name     = p.title || p.name || '—'
-            const imgUrl   = p.image_url || p.imageUrl
-            const discount = p.discountPercent || p.discount || 0
-            const cat      = p.category || 'Boshqa'
-            const active   = p.active  !== false
-            const inStock  = p.inStock !== false
-
-            return (
-              <div
-                key={i}
-                className="glass fade-up flex gap-3 p-3"
-                style={{
-                  animationDelay: `${Math.min(i * 40, 300)}ms`,
-                  opacity: active ? 1 : 0.55,
-                }}
-              >
-                {imgUrl ? (
-                  <img
-                    src={imgUrl}
-                    alt={name}
-                    loading="lazy"
-                    className="w-16 h-16 rounded-xl object-cover flex-shrink-0"
-                    style={{ border: '1px solid var(--border)' }}
-                  />
-                ) : (
-                  <div
-                    className="w-16 h-16 rounded-xl flex-shrink-0 flex items-center justify-center"
-                    style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid var(--border)' }}
-                  >
-                    <Package size={20} style={{ color: 'var(--accent)' }} />
-                  </div>
-                )}
-
-                <div className="flex-1 min-w-0">
-                  <p
-                    className="font-medium text-sm truncate"
-                    style={{ color: 'var(--fg)' }}
-                  >
-                    {name}
-                  </p>
-                  <p
-                    className="text-sm font-semibold mt-0.5"
-                    style={{ color: 'var(--accent-hover)', fontVariantNumeric: 'tabular-nums' }}
-                  >
-                    {fmt(p.price)}
-                  </p>
-
-                  <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                    <span
-                      className="text-xs px-2 py-0.5 rounded-full font-medium"
-                      style={{
-                        background: CAT_COLORS[cat] || CAT_COLORS['Boshqa'],
-                        color:      CAT_TEXT[cat]   || CAT_TEXT['Boshqa'],
-                      }}
-                    >
-                      {cat}
-                    </span>
-                    {discount > 0 && (
-                      <span
-                        className="text-xs px-2 py-0.5 rounded-full font-medium"
-                        style={{ background: 'rgba(239,68,68,0.12)', color: '#f87171' }}
-                      >
-                        -{discount}%
-                      </span>
-                    )}
-                    {!active && (
-                      <span
-                        className="text-xs px-2 py-0.5 rounded-full font-medium"
-                        style={{ background: 'rgba(239,68,68,0.12)', color: '#f87171' }}
-                      >
-                        Nofaol
-                      </span>
-                    )}
-                    {!inStock && (
-                      <span
-                        className="text-xs px-2 py-0.5 rounded-full font-medium"
-                        style={{ background: 'rgba(245,158,11,0.12)', color: '#fbbf24' }}
-                      >
-                        Tugagan
-                      </span>
-                    )}
-                  </div>
-
-                  {user.is_superadmin && p.added_by_name && (
-                    <p className="text-xs mt-1" style={{ color: 'var(--fg-muted)' }}>
-                      {p.added_by_name}
-                    </p>
-                  )}
-
-                  {/* Superadmin toggle tugmalari */}
-                  {user.is_superadmin && (
-                    <div className="flex flex-wrap gap-2 mt-2.5">
-                      {/* Faol / Nofaol */}
-                      <button
-                        disabled={toggling === `${id}:active`}
-                        onClick={() => toggleField(id, 'active', active)}
-                        className="text-xs px-2.5 py-1 rounded-lg font-medium cursor-pointer transition-all duration-150 active:scale-95 disabled:opacity-50"
-                        style={{
-                          background: active ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)',
-                          color: active ? '#f87171' : '#4ade80',
-                          border: `1px solid ${active ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)'}`,
-                        }}
-                      >
-                        {toggling === `${id}:active` ? '…' : active ? '🔴 O\'chirish' : '🟢 Faollashtirish'}
-                      </button>
-
-                      {/* Bor / Tugadi */}
-                      <button
-                        disabled={toggling === `${id}:in_stock`}
-                        onClick={() => toggleField(id, 'in_stock', inStock)}
-                        className="text-xs px-2.5 py-1 rounded-lg font-medium cursor-pointer transition-all duration-150 active:scale-95 disabled:opacity-50"
-                        style={{
-                          background: inStock ? 'rgba(245,158,11,0.1)' : 'rgba(34,197,94,0.1)',
-                          color: inStock ? '#fbbf24' : '#4ade80',
-                          border: `1px solid ${inStock ? 'rgba(245,158,11,0.2)' : 'rgba(34,197,94,0.2)'}`,
-                        }}
-                      >
-                        {toggling === `${id}:in_stock` ? '…' : inStock ? '⚠️ Tugadi' : '📦 Bor'}
-                      </button>
-
-                      {/* Tahrirlash */}
-                      <button
-                        onClick={() => openEdit(p)}
-                        className="text-xs px-2.5 py-1 rounded-lg font-medium cursor-pointer transition-all duration-150 active:scale-95 flex items-center gap-1"
-                        style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)' }}
-                      >
-                        <Pencil size={11} /> Tahrirlash
-                      </button>
-
-                                      {/* O'chirish */}
-                      <button
-                        onClick={() => setDeleteId(id)}
-                        className="text-xs px-2.5 py-1 rounded-lg font-medium cursor-pointer transition-all duration-150 active:scale-95 flex items-center gap-1"
-                        style={{ background: 'rgba(239,68,68,0.08)', color: '#f87171', border: '1px solid rgba(239,68,68,0.18)' }}
-                      >
-                        <Trash2 size={11} /> O'chirish
-                      </button>
-
-                    </div>
-                  )}
+              <div className="flex gap-4">
+                {/* Narx */}
+                <div className="flex-1">
+                  <label className="text-xs font-bold mb-1.5 block uppercase tracking-wider" style={{ color: 'var(--fg-muted)' }}>Narx (so'm)</label>
+                  <input className="field w-full" type="number" inputMode="numeric" value={editForm.price} onChange={e => setEditForm(f => ({ ...f, price: e.target.value }))} disabled={editSaving} />
+                </div>
+                {/* Chegirma */}
+                <div className="flex-1">
+                  <label className="text-xs font-bold mb-1.5 block uppercase tracking-wider" style={{ color: 'var(--fg-muted)' }}>Chegirma (%)</label>
+                  <input className="field w-full" type="number" inputMode="numeric" value={editForm.discount} onChange={e => setEditForm(f => ({ ...f, discount: e.target.value }))} min={0} max={90} disabled={editSaving} />
                 </div>
               </div>
-            )
-          })}
+
+              {/* Kategoriya */}
+              <div>
+                <label className="text-xs font-bold mb-2 block uppercase tracking-wider" style={{ color: 'var(--fg-muted)' }}>Kategoriya</label>
+                <div className="flex flex-wrap gap-2">
+                  {['Kiyim','Elektronika','Poyabzal','Aksessuar','Sport','Uy uchun','Boshqa'].map(cat => (
+                    <button
+                      key={cat} type="button" disabled={editSaving}
+                      onClick={() => setEditForm(f => ({ ...f, category: cat }))}
+                      className="px-3 py-1.5 rounded-lg text-sm font-semibold cursor-pointer transition-colors"
+                      style={editForm.category === cat 
+                        ? { background: 'rgba(99,102,241,0.2)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.4)' }
+                        : { background: 'var(--bg)', color: 'var(--fg)', border: '1px solid var(--border)' }}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Tavsif */}
+              <div>
+                <label className="text-xs font-bold mb-1.5 block uppercase tracking-wider" style={{ color: 'var(--fg-muted)' }}>Tavsif</label>
+                <textarea className="field w-full resize-none" value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} rows={3} disabled={editSaving} />
+              </div>
+
+              <div className="border-t my-2" style={{ borderColor: 'var(--border)' }}></div>
+
+              {/* Variant toggle */}
+              <div className="flex items-center justify-between p-4 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)' }}>
+                <div>
+                  <h4 className="font-semibold text-sm" style={{ color: 'var(--fg)' }}>Ranglar va razmerlar</h4>
+                  <p className="text-xs mt-1" style={{ color: 'var(--fg-muted)' }}>Mahsulotning narxi va rasmlari farq qiladimi?</p>
+                </div>
+                <button
+                  type="button" disabled={editSaving}
+                  onClick={() => setEditForm(f => ({
+                    ...f, variantlar_yoqilgan: !f.variantlar_yoqilgan,
+                    variant_nomlari:  !f.variantlar_yoqilgan && f.variant_nomlari.length === 0 ? [''] : f.variant_nomlari,
+                    variant_narxlari: !f.variantlar_yoqilgan && f.variant_narxlari.length === 0 ? [''] : f.variant_narxlari,
+                  }))}
+                  className="px-4 py-2 rounded-xl text-sm font-bold transition-colors cursor-pointer"
+                  style={{
+                    background: editForm.variantlar_yoqilgan ? '#818cf8' : 'var(--bg)',
+                    color: editForm.variantlar_yoqilgan ? '#fff' : 'var(--fg)',
+                    border: `1px solid ${editForm.variantlar_yoqilgan ? '#818cf8' : 'var(--border)'}`
+                  }}
+                >
+                  {editForm.variantlar_yoqilgan ? 'Yoqilgan' : "O'chirilgan"}
+                </button>
+              </div>
+
+              {/* Variant qatorlari */}
+              {editForm.variantlar_yoqilgan && (
+                <div className="flex flex-col gap-4 p-4 rounded-xl mt-2" style={{ background: 'var(--bg)', border: '1px dashed var(--border)' }}>
+                  <label className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--fg-muted)' }}>Variantlar (Rang va Narx)</label>
+                  {editForm.variant_nomlari.map((nom, idx) => (
+                    <div key={idx} className="flex flex-col gap-2 p-3 rounded-lg border" style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}>
+                      <div className="flex gap-2 items-center">
+                        <input className="field flex-1" placeholder="Rang nomi" value={nom} disabled={editSaving} onChange={e => setEditForm(f => { const n = [...f.variant_nomlari]; n[idx] = e.target.value; return { ...f, variant_nomlari: n } })} />
+                        <input className="field w-32" type="number" inputMode="numeric" placeholder="Narx" value={editForm.variant_narxlari[idx] ?? ''} disabled={editSaving} onChange={e => setEditForm(f => { const n = [...f.variant_narxlari]; n[idx] = e.target.value; return { ...f, variant_narxlari: n } })} />
+                        <button type="button" disabled={editSaving} onClick={() => setEditForm(f => ({ ...f, variant_nomlari: f.variant_nomlari.filter((_, i) => i !== idx), variant_narxlari: f.variant_narxlari.filter((_, i) => i !== idx) }))} className="w-10 h-10 flex items-center justify-center rounded-xl transition-colors hover:bg-red-500/20" style={{ color: '#f87171' }}><X size={16} /></button>
+                      </div>
+                      
+                      {/* Razmerlar shu rang uchun */}
+                      <div className="mt-2 pl-4 border-l-2" style={{ borderColor: 'var(--border)' }}>
+                        <p className="text-xs mb-2 font-medium" style={{ color: 'var(--fg-muted)' }}>Razmerlar (S, M, L...)</p>
+                        {(sizesByColor[idx] || []).map((size, sizeIndex) => (
+                          <div key={sizeIndex} className="flex gap-2 mb-2 items-center">
+                            <input className="field flex-1 text-sm py-1.5" placeholder="Razmer" value={size.nomi} onChange={e => updateSize(idx, sizeIndex, 'nomi', e.target.value)} disabled={editSaving} />
+                            <input className="field w-28 text-sm py-1.5" type="number" placeholder="Narxi" value={size.narx} onChange={e => updateSize(idx, sizeIndex, 'narx', e.target.value)} disabled={editSaving} />
+                            <button type="button" onClick={() => removeSize(idx, sizeIndex)} disabled={editSaving} className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg"><X size={14}/></button>
+                          </div>
+                        ))}
+                        <button type="button" onClick={() => addSize(idx)} disabled={editSaving} className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors" style={{ color: '#818cf8', background: 'rgba(99,102,241,0.1)' }}>+ Razmer qo'shish</button>
+                      </div>
+                    </div>
+                  ))}
+                  <button type="button" disabled={editSaving} onClick={() => setEditForm(f => ({ ...f, variant_nomlari: [...f.variant_nomlari, ''], variant_narxlari: [...f.variant_narxlari, ''] }))} className="w-full py-2.5 rounded-xl text-sm font-bold border-2 border-dashed transition-colors" style={{ borderColor: 'var(--border)', color: 'var(--fg-muted)' }}>
+                    + Yangi rang qo'shish
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-4 border-t mt-2 flex justify-end gap-3" style={{ borderColor: 'var(--border)' }}>
+              <button onClick={() => { setEditProduct(null); setSizesByColor({}) }} disabled={editSaving} className="px-5 py-2.5 rounded-xl font-bold transition-colors hover:bg-white/5" style={{ color: 'var(--fg)' }}>Bekor qilish</button>
+              <button onClick={saveEdit} disabled={editSaving} className="px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-opacity hover:opacity-90 shadow-lg shadow-indigo-500/20" style={{ background: '#6366f1', color: '#fff' }}>
+                {editSaving ? <RefreshCw size={18} className="animate-spin" /> : <><Check size={18} /> Saqlash</>}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

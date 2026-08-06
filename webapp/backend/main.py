@@ -66,11 +66,35 @@ IMGBB_API_KEY        = os.environ.get("IMGBB_API_KEY", "")
 UPLOADS_DIR          = Path(os.environ.get("UPLOADS_DIR", "/opt/xitoy_webapp/uploads"))
 SITE_BASE_URL        = os.environ.get("SITE_BASE_URL", "https://admin.eliboyev.uz")
 DB_PATH              = os.environ.get("DB_PATH", "admins.db")
+APPS_SCRIPT_SECRET   = os.environ.get("APPS_SCRIPT_SECRET", "")
+ALLOWED_ORIGINS      = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", SITE_BASE_URL).split(",") if o.strip()]
+
+# Migratsiyada eski admin qatorlariga beriladigan boshlang'ich parol — har ishga
+# tushishda tasodifiy, shu bilan hamma joyda bir xil ma'lum parol qolmaydi.
+_DEFAULT_ADMIN_PASSWORD = secrets.token_hex(4)
+
+def fix_image_url(url: str) -> str:
+    """localhost yoki 127.0.0.1 bo'lsa SITE_BASE_URL ga almashtiradi."""
+    if not url:
+        return url
+    for old in ("http://localhost:8000", "http://127.0.0.1:8000"):
+        if url.startswith(old):
+            return url.replace(old, SITE_BASE_URL, 1)
+    return url
+
 
 # Login bot username (@ siz). Deep-link uchun.
 LOGIN_BOT_USERNAME = os.environ.get("LOGIN_BOT_USERNAME", "dalli_login_robot")
 
-CATEGORIES = ["Kiyim", "Elektronika", "Poyabzal", "Aksessuar", "Sport", "Uy uchun", "Boshqa"]
+CATEGORIES = [
+    "Texnika va elektronika", "Yozgi kolleksiya", "Mebel", "Turizm, baliq ovi va ovchilik",
+    "Elektronika", "Maishiy texnika", "Kiyim", "Poyabzallar", "Aksessuarlar",
+    "Go'zallik va parvarish", "Salomatlik", "Uy-ro'zg'or buyumlari", "Qurilish va ta'mirlash",
+    "Avtotovarlar", "Bolalar tovarlari", "Xobbi va ijod", "Sport va hordiq",
+    "Oziq-ovqat mahsulotlari", "Maishiy kimyoviy moddalar", "Kanselyariya tovarlari",
+    "Hayvonlar uchun tovarlar", "Kitoblar", "Dacha, bog' va tomorqa",
+    "Reabilitatsiya uchun subsidiyalangan mahsulotlar", "Boshqa"
+]
 
 # Sarlavha qisqartirish uchun keraksiz marketing so'zlari ro'yxati
 # (real tarjima natijalarini ko'rib, kengaytirish mumkin)
@@ -277,15 +301,27 @@ async def check_cart_reminders():
 # ── Database ───────────────────────────────────────────────────────────────────
 async def init_db():
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("""
+        await db.execute(f"""
             CREATE TABLE IF NOT EXISTS admins (
                 telegram_id  INTEGER PRIMARY KEY,
                 name         TEXT    NOT NULL,
                 categories   TEXT    NOT NULL DEFAULT '[]',
                 active       INTEGER NOT NULL DEFAULT 1,
+                password     TEXT    NOT NULL DEFAULT '{_DEFAULT_ADMIN_PASSWORD}',
                 created_at   TEXT    DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        try:
+            await db.execute(
+                f"ALTER TABLE admins ADD COLUMN password TEXT NOT NULL DEFAULT '{_DEFAULT_ADMIN_PASSWORD}'"
+            )
+            log.warning(
+                "admins.password ustuni birinchi marta qo'shildi — mavjud adminlarga "
+                "vaqtinchalik parol tayinlandi: %s (darhol /parol orqali almashtiring)",
+                _DEFAULT_ADMIN_PASSWORD,
+            )
+        except aiosqlite.OperationalError:
+            pass
         await db.execute("""
             CREATE TABLE IF NOT EXISTS channels (
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -367,7 +403,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -640,45 +676,67 @@ async def admin_login(data: AdminLoginIn):
     tg_id_str = str(data.telegram_id or "").strip()
     passcode = (data.passcode or "").strip()
 
-    # 1. Superadmin kirishi (Parol "admin" yoki SUPERADMIN_ID)
-    if passcode == "admin" or (SUPERADMIN_ID and tg_id_str == str(SUPERADMIN_ID)):
-        token = f"admin_token_{SUPERADMIN_ID or 5049583350}"
-        return {
-            "token": token,
-            "user": {
-                "telegram_id": SUPERADMIN_ID or 5049583350,
-                "name": "Superadmin",
-                "username": "superadmin",
-                "categories": CATEGORIES,
-                "is_superadmin": True,
-            },
-        }
+    if not tg_id_str.isdigit() or not passcode:
+        raise HTTPException(401, "Telegram ID va parol kiritilishi shart")
 
-    # 2. Telegram ID bo'yicha Admin kirishi
-    if tg_id_str.isdigit():
-        tg_id = int(tg_id_str)
-        async with aiosqlite.connect(DB_PATH) as db:
-            async with db.execute(
-                "SELECT name, categories, active FROM admins WHERE telegram_id = ?", (tg_id,)
-            ) as cur:
-                row = await cur.fetchone()
+    tg_id = int(tg_id_str)
+    
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT name, categories, active, password FROM admins WHERE telegram_id = ?", (tg_id,)
+        ) as cur:
+            row = await cur.fetchone()
 
-        if row and row[2]:
-            is_super = (tg_id == SUPERADMIN_ID)
-            token = f"admin_token_{tg_id}"
-            return {
-                "token": token,
-                "user": {
-                    "telegram_id": tg_id,
-                    "name": row[0],
-                    "username": "",
-                    "categories": CATEGORIES if is_super else json.loads(row[1]),
-                    "is_superadmin": is_super,
-                },
-            }
+    if not row or not row[2]:
+        raise HTTPException(401, "Tizimga kirish ruxsati yo'q yoki admin faol emas")
+        
+    db_password = row[3] if len(row) > 3 and row[3] else _DEFAULT_ADMIN_PASSWORD
 
-    raise HTTPException(401, "Tizimga kirish taqiqlangan. Telegram ID yoki parol noto'g'ri.")
+    if not hmac.compare_digest(passcode, db_password):
+        raise HTTPException(401, "Telegram ID yoki parol noto'g'ri")
 
+    is_super = (tg_id == SUPERADMIN_ID)
+    token = f"admin_token_{tg_id}"
+    return {
+        "token": token,
+        "user": {
+            "telegram_id": tg_id,
+            "name": row[0],
+            "username": "superadmin" if is_super else "",
+            "categories": CATEGORIES if is_super else json.loads(row[1]),
+            "is_superadmin": is_super,
+        },
+    }
+
+class WebAppLoginIn(BaseModel):
+    init_data: str
+
+@app.post("/api/auth/webapp-login")
+async def webapp_login(data: WebAppLoginIn):
+    tg = _verify_init_data(data.init_data)
+    tg_id = int(tg["id"])
+
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT name, categories, active FROM admins WHERE telegram_id = ?", (tg_id,)
+        ) as cur:
+            row = await cur.fetchone()
+
+    if not row or not row[2]:
+        raise HTTPException(403, "Ruxsat yo'q. Superadmin sizni qo'shishi kerak.")
+
+    is_super = (tg_id == SUPERADMIN_ID)
+    token = f"admin_token_{tg_id}"
+    return {
+        "token": token,
+        "user": {
+            "telegram_id": tg_id,
+            "name": tg.get("first_name", row[0]),
+            "username": tg.get("username", ""),
+            "categories": CATEGORIES if is_super else json.loads(row[1]),
+            "is_superadmin": is_super,
+        },
+    }
 
 def _verify_init_data(init_data: str) -> dict:
     """Telegram WebApp initData ni tekshiradi, user dict qaytaradi."""
@@ -720,14 +778,6 @@ async def get_current_user(
 
     # A) Token orqali kirish (Standart Web brauzer)
     if token:
-        if token in (f"admin_token_{SUPERADMIN_ID}", "admin_token_0", "superadmin"):
-            return {
-                "telegram_id": SUPERADMIN_ID or 5049583350,
-                "name": "Superadmin",
-                "username": "superadmin",
-                "categories": CATEGORIES,
-                "is_superadmin": True,
-            }
         if token.startswith("admin_token_"):
             try:
                 tg_id = int(token.replace("admin_token_", ""))
@@ -971,7 +1021,7 @@ class ProductUpdate(BaseModel):
 
 # ── Helpers — Google Sheets ────────────────────────────────────────────────────
 def _sheets_post(data: dict) -> dict:
-    payload = json.dumps(data).encode()
+    payload = json.dumps({**data, "secret": APPS_SCRIPT_SECRET}).encode()
     req = urllib.request.Request(
         APPS_SCRIPT_URL, data=payload,
         headers={"Content-Type": "application/json"},
@@ -984,7 +1034,8 @@ def _sheets_post(data: dict) -> dict:
 
 
 def _sheets_get() -> list:
-    with urllib.request.urlopen(APPS_SCRIPT_URL, timeout=20) as r:
+    query = urllib.parse.urlencode({"secret": APPS_SCRIPT_SECRET})
+    with urllib.request.urlopen(f"{APPS_SCRIPT_URL}?{query}", timeout=20) as r:
         return json.loads(r.read())
 
 
@@ -1237,20 +1288,30 @@ async def get_categories():
 
 # ── /api/products ──────────────────────────────────────────────────────────────
 @app.get("/api/products")
-async def list_products(user: dict = Depends(get_current_user)):
+async def list_products(
+    x_admin_token: Annotated[str, Header()] = "",
+    authorization: Annotated[str, Header()] = "",
+):
+    # Token bo'lsa admin, bo'lmasa oddiy foydalanuvchi (hammaga ochiq)
+    token = x_admin_token or (authorization.replace("Bearer ", "").strip() if authorization else "")
+    is_admin = bool(token)
+
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("SELECT * FROM products ORDER BY id DESC") as cur:
             rows = await cur.fetchall()
 
-    allowed = set(user["categories"]) if not user["is_superadmin"] else None
     products = []
     for r in rows:
         d = dict(r)
-        if allowed and d.get("category") not in allowed:
+        # Faol bo'lmagan tovarlarni oddiy foydalanuvchidan yashiramiz
+        if not is_admin and not d.get("active", 1):
             continue
 
-        images = json.loads(d.get("images") or "[]")
+
+        images_raw = json.loads(d.get("images") or "[]")
+        images = [fix_image_url(u) for u in images_raw]
+        img_url = fix_image_url(d.get("image_url", ""))
         var_nom = json.loads(d.get("variant_nomlari") or "[]")
         var_narx = json.loads(d.get("variant_narxlari") or "[]")
         razmer = json.loads(d.get("razmer_matritsa") or "{}")
@@ -1264,9 +1325,9 @@ async def list_products(user: dict = Depends(get_current_user)):
             "discount":           d.get("discount", 0),
             "discountPercent":    int(d.get("discount", 0)),
             "category":           d.get("category", "Boshqa"),
-            "image":              d.get("image_url", ""),
-            "image_url":          d.get("image_url", ""),
-            "imageUrl":           d.get("image_url", ""),
+            "image":              img_url,
+            "image_url":          img_url,
+            "imageUrl":           img_url,
             "images":             images,
             "sold_count":         d.get("sold_count", 0),
             "rating":             d.get("rating", 4.5),
@@ -1278,6 +1339,7 @@ async def list_products(user: dict = Depends(get_current_user)):
             "variantNarxlari":    var_narx,
             "razmerMatritsa":     razmer,
         })
+
     return products
 
 
@@ -1466,16 +1528,27 @@ async def list_admins(_: dict = Depends(require_super)):
 
 @app.post("/api/admins", status_code=201)
 async def create_admin(admin: AdminIn, _: dict = Depends(require_super)):
+    password = "".join(random.choices("0123456789", k=6))
     async with aiosqlite.connect(DB_PATH) as db:
         try:
             await db.execute(
-                "INSERT INTO admins (telegram_id, name, categories) VALUES (?, ?, ?)",
-                (admin.telegram_id, admin.name, json.dumps(admin.categories)),
+                "INSERT INTO admins (telegram_id, name, categories, password) VALUES (?, ?, ?, ?)",
+                (admin.telegram_id, admin.name, json.dumps(admin.categories), password),
             )
             await db.commit()
         except aiosqlite.IntegrityError:
             raise HTTPException(409, "Bu admin allaqachon mavjud")
-    return {"ok": True}
+
+    try:
+        text = f"Siz Dalli Shop tizimida admin etib tayinlandingiz!\n\nSaytga kirish: https://admin.eliboyev.uz\nSizning ID: {admin.telegram_id}\nParolingiz: {password}"
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+        data = json.dumps({"chat_id": admin.telegram_id, "text": text}).encode('utf-8')
+        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+        urllib.request.urlopen(req, timeout=5)
+    except Exception as e:
+        log.error(f"Failed to send password to new admin {admin.telegram_id}: {e}")
+
+    return {"ok": True, "password": password}
 
 
 @app.put("/api/admins/{telegram_id}")
@@ -1632,7 +1705,7 @@ class OrderStatusPatch(BaseModel):
 
 def _sheets_get_params(params: dict) -> dict:
     """Apps Script ga GET so'rov (query parametrlar bilan)."""
-    query = urllib.parse.urlencode(params)
+    query = urllib.parse.urlencode({**params, "secret": APPS_SCRIPT_SECRET})
     with urllib.request.urlopen(f"{APPS_SCRIPT_URL}?{query}", timeout=20) as r:
         return json.loads(r.read())
 
@@ -2102,9 +2175,11 @@ frontend_dir = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
 if os.path.isdir(frontend_dir):
     from fastapi.responses import FileResponse
 
+    _frontend_root = Path(frontend_dir).resolve()
+
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
-        file_path = os.path.join(frontend_dir, full_path)
-        if os.path.isfile(file_path):
-            return FileResponse(file_path)
-        return FileResponse(os.path.join(frontend_dir, "index.html"))
+        candidate = (_frontend_root / full_path).resolve()
+        if candidate.is_relative_to(_frontend_root) and candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(_frontend_root / "index.html")

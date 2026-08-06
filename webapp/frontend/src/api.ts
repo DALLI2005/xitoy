@@ -41,6 +41,18 @@ export const api = {
     return res
   },
 
+  webappLogin: async (initData: string) => {
+    const res = await request<{ token: string; user: import('./types').User }>('/auth/webapp-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ init_data: initData }),
+    })
+    if (res.token) {
+      localStorage.setItem('admin_token', res.token)
+    }
+    return res
+  },
+
   logout: () => {
     localStorage.removeItem('admin_token')
   },

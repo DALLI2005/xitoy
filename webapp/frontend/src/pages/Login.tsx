@@ -8,9 +8,8 @@ interface LoginProps {
 }
 
 export default function Login({ onSuccess }: LoginProps) {
-  const [tab, setTab] = useState<'superadmin' | 'admin'>('superadmin')
-  const [passcode, setPasscode] = useState('admin')
   const [telegramId, setTelegramId] = useState('')
+  const [passcode, setPasscode] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -20,16 +19,17 @@ export default function Login({ onSuccess }: LoginProps) {
     setLoading(true)
 
     try {
-      if (tab === 'superadmin') {
-        const res = await api.adminLogin({ passcode: passcode.trim() || 'admin' })
-        onSuccess(res.user)
-      } else {
-        if (!telegramId.trim()) {
-          throw new Error('Iltimos, Telegram ID kiriting')
-        }
-        const res = await api.adminLogin({ telegram_id: telegramId.trim() })
-        onSuccess(res.user)
+      if (!telegramId.trim()) {
+        throw new Error('Iltimos, Telegram ID kiriting')
       }
+      if (!passcode.trim()) {
+        throw new Error('Iltimos, Parol kiriting')
+      }
+      const res = await api.adminLogin({ 
+        telegram_id: telegramId.trim(),
+        passcode: passcode.trim()
+      })
+      onSuccess(res.user)
     } catch (err: any) {
       setError(err.message || 'Kirishda xatolik yuz berdi')
     } finally {
@@ -84,30 +84,6 @@ export default function Login({ onSuccess }: LoginProps) {
             boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5)',
           }}
         >
-          {/* Tab Selector */}
-          <div className="flex p-1 rounded-xl mb-6" style={{ background: 'rgba(255, 255, 255, 0.05)' }}>
-            <button
-              type="button"
-              onClick={() => { setTab('superadmin'); setError('') }}
-              className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
-                tab === 'superadmin' ? 'bg-indigo-600 text-white shadow-md' : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              <KeyRound size={14} />
-              Superadmin
-            </button>
-            <button
-              type="button"
-              onClick={() => { setTab('admin'); setError('') }}
-              className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all ${
-                tab === 'admin' ? 'bg-indigo-600 text-white shadow-md' : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              <UserCheck size={14} />
-              Admin (Telegram ID)
-            </button>
-          </div>
-
           {error && (
             <div
               className="p-3.5 rounded-xl mb-5 text-xs font-medium border flex items-center gap-2"
@@ -123,39 +99,34 @@ export default function Login({ onSuccess }: LoginProps) {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {tab === 'superadmin' ? (
-              <div>
-                <label className="block text-xs font-medium mb-2 text-zinc-300">
-                  Superadmin Paroli
-                </label>
-                <div className="relative">
-                  <input
-                    type="password"
-                    value={passcode}
-                    onChange={(e) => setPasscode(e.target.value)}
-                    placeholder="Parol kiriting"
-                    required
-                    className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all border text-white placeholder-zinc-500"
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.03)',
-                      borderColor: 'rgba(255, 255, 255, 0.1)',
-                    }}
-                  />
-                </div>
-                <p className="text-[11px] mt-1.5 text-zinc-500">
-                  Standart parol: <span className="text-indigo-400 font-mono">admin</span>
-                </p>
-              </div>
-            ) : (
-              <div>
-                <label className="block text-xs font-medium mb-2 text-zinc-300">
-                  Telegram ID ingiz
-                </label>
+            <div>
+              <label className="block text-xs font-medium mb-2 text-zinc-300">
+                Telegram ID ingiz
+              </label>
+              <input
+                type="text"
+                value={telegramId}
+                onChange={(e) => setTelegramId(e.target.value)}
+                placeholder="Masalan: 5049583350"
+                required
+                className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all border text-white placeholder-zinc-500"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  borderColor: 'rgba(255, 255, 255, 0.1)',
+                }}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-xs font-medium mb-2 text-zinc-300">
+                Parolingiz (Superadmin yoki bot orqali berilgan)
+              </label>
+              <div className="relative">
                 <input
-                  type="text"
-                  value={telegramId}
-                  onChange={(e) => setTelegramId(e.target.value)}
-                  placeholder="Masalan: 5049583350"
+                  type="password"
+                  value={passcode}
+                  onChange={(e) => setPasscode(e.target.value)}
+                  placeholder="Parol kiriting"
                   required
                   className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all border text-white placeholder-zinc-500"
                   style={{
@@ -163,11 +134,8 @@ export default function Login({ onSuccess }: LoginProps) {
                     borderColor: 'rgba(255, 255, 255, 0.1)',
                   }}
                 />
-                <p className="text-[11px] mt-1.5 text-zinc-500">
-                  Admin sifatida ro'yxatga olingan Telegram ID kiriting
-                </p>
               </div>
-            )}
+            </div>
 
             <button
               type="submit"

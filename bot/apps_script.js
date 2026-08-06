@@ -9,6 +9,16 @@
 
 var SHEET_ID = "1_Gsq4ZvabXpbe5bcBOIKbL4xSiKZj80f70RYgr5LzkA";
 
+// Xavfsizlik: har bir so'rov shu maxfiy kalitni yuborishi shart.
+// O'rnatish: Apps Script muharriri → Project Settings → Script Properties →
+// "SHARED_SECRET" nomi bilan tasodifiy uzun matn qo'shing, xuddi shu qiymatni
+// bot/.env va webapp/backend/.env fayllaridagi APPS_SCRIPT_SECRET ga yozing.
+function _checkSecret(provided) {
+  var expected = PropertiesService.getScriptProperties().getProperty('SHARED_SECRET');
+  if (!expected) return true; // sozlanmagan bo'lsa eski xatti-harakat (o'tish davri uchun)
+  return String(provided || '') === expected;
+}
+
 function toBool(val, defaultVal) {
   if (val === "" || val === null || val === undefined) return defaultVal;
   return val !== 0 && val !== "0" && val !== false && val !== "false";
@@ -25,6 +35,9 @@ function safeParseObject(val) {
 }
 
 function doGet(e) {
+  if (!_checkSecret(e.parameter.secret)) {
+    return jsonOut({ ok: false, error: "Ruxsat yo'q: noto'g'ri secret" });
+  }
   if (e.parameter.action === "getUserOrders" && e.parameter.telegram_id) {
     return jsonOut(getUserOrders(e.parameter.telegram_id));
   }
@@ -101,6 +114,10 @@ function getUserOrders(telegram_id) {
 function doPost(e) {
   try {
     var d = JSON.parse(e.postData.contents);
+
+    if (!_checkSecret(d.secret)) {
+      return jsonOut({ ok: false, error: "Ruxsat yo'q: noto'g'ri secret" });
+    }
 
     if (d.action === "getUser")                return jsonOut(getUser(d.telegram_id));
     if (d.action === "saveUser")               return jsonOut(saveUser(d));
