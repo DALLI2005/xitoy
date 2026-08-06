@@ -992,12 +992,21 @@ class AdminIn(BaseModel):
     telegram_id: int
     name:        str
     categories:  list[str]
+    password:    str
+
+    @field_validator("password")
+    @classmethod
+    def _password_min_len(cls, v: str) -> str:
+        if len(v) < 4:
+            raise ValueError("Parol kamida 4 belgidan iborat bo'lishi kerak")
+        return v
 
 
 class AdminPatch(BaseModel):
     name:       str | None        = None
     categories: list[str] | None  = None
     active:     bool | None       = None
+    password:   str | None        = None
 
 
 class ProductPatch(BaseModel):
@@ -1528,19 +1537,21 @@ async def list_admins(_: dict = Depends(require_super)):
 
 @app.post("/api/admins", status_code=201)
 async def create_admin(admin: AdminIn, _: dict = Depends(require_super)):
-    password = "".join(random.choices("0123456789", k=6))
     async with aiosqlite.connect(DB_PATH) as db:
         try:
             await db.execute(
                 "INSERT INTO admins (telegram_id, name, categories, password) VALUES (?, ?, ?, ?)",
-                (admin.telegram_id, admin.name, json.dumps(admin.categories), password),
+                (admin.telegram_id, admin.name, json.dumps(admin.categories), admin.password),
             )
             await db.commit()
         except aiosqlite.IntegrityError:
             raise HTTPException(409, "Bu admin allaqachon mavjud")
 
     try:
-        text = f"Siz Dalli Shop tizimida admin etib tayinlandingiz!\n\nSaytga kirish: https://admin.eliboyev.uz\nSizning ID: {admin.telegram_id}\nParolingiz: {password}"
+        text = (
+            f"Siz Dalli Shop tizimida admin etib tayinlandingiz!\n\n"
+            f"Saytga kirish: {SITE_BASE_URL}\nSizning ID: {admin.telegram_id}\nParolingiz: {admin.password}"
+        )
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
         data = json.dumps({"chat_id": admin.telegram_id, "text": text}).encode('utf-8')
         req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
@@ -1548,7 +1559,7 @@ async def create_admin(admin: AdminIn, _: dict = Depends(require_super)):
     except Exception as e:
         log.error(f"Failed to send password to new admin {admin.telegram_id}: {e}")
 
-    return {"ok": True, "password": password}
+    return {"ok": True}
 
 
 @app.put("/api/admins/{telegram_id}")
@@ -1563,6 +1574,10 @@ async def update_admin(telegram_id: int, patch: AdminPatch, _: dict = Depends(re
         fields.append("categories = ?"); values.append(json.dumps(patch.categories))
     if patch.active is not None:
         fields.append("active = ?"); values.append(int(patch.active))
+    if patch.password is not None:
+        if len(patch.password) < 4:
+            raise HTTPException(400, "Parol kamida 4 belgidan iborat bo'lishi kerak")
+        fields.append("password = ?"); values.append(patch.password)
     if not fields:
         raise HTTPException(400, "Hech narsa o'zgartirilmadi")
 

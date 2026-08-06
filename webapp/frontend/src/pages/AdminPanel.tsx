@@ -17,12 +17,16 @@ export default function AdminPanel() {
   const [showForm, setShowForm]   = useState(false)
   const [newId, setNewId]         = useState('')
   const [newName, setNewName]     = useState('')
+  const [newPassword, setNewPassword] = useState('')
   const [newCats, setNewCats]     = useState<string[]>([])
   const [saving, setSaving]       = useState(false)
   const [formErr, setFormErr]     = useState('')
 
-  const [editId, setEditId]     = useState<number | null>(null)
-  const [editCats, setEditCats] = useState<string[]>([])
+  const [editId, setEditId]         = useState<number | null>(null)
+  const [editCats, setEditCats]     = useState<string[]>([])
+  const [editPassword, setEditPassword] = useState('')
+  const [pwSaving, setPwSaving]     = useState(false)
+  const [pwErr, setPwErr]           = useState('')
 
   const [notifEnabled, setNotifEnabled] = useState(true)
   const [notifLoading, setNotifLoading] = useState(false)
@@ -105,16 +109,34 @@ export default function AdminPanel() {
     setFormErr('')
     if (!newId.trim() || isNaN(+newId)) return setFormErr('Telegram ID raqam bo\'lishi kerak')
     if (!newName.trim())                return setFormErr('Ism kiriting')
+    if (newPassword.trim().length < 4)  return setFormErr('Parol kamida 4 belgidan iborat bo\'lishi kerak')
     if (!newCats.length)                return setFormErr('Kamida 1 ta kategoriya tanlang')
     setSaving(true)
     try {
-      await api.createAdmin({ telegram_id: +newId, name: newName.trim(), categories: newCats })
+      await api.createAdmin({
+        telegram_id: +newId,
+        name: newName.trim(),
+        categories: newCats,
+        password: newPassword.trim(),
+      })
       hapticSuccess()
-      setShowForm(false); setNewId(''); setNewName(''); setNewCats([])
+      setShowForm(false); setNewId(''); setNewName(''); setNewPassword(''); setNewCats([])
       await load()
     } catch (e: any) {
       hapticError(); setFormErr(e.message)
     } finally { setSaving(false) }
+  }
+
+  async function savePassword(telegramId: number) {
+    setPwErr('')
+    if (editPassword.trim().length < 4) return setPwErr('Parol kamida 4 belgidan iborat bo\'lishi kerak')
+    setPwSaving(true)
+    try {
+      await api.updateAdmin(telegramId, { password: editPassword.trim() })
+      hapticSuccess(); setEditPassword('')
+    } catch (e: any) {
+      hapticError(); setPwErr(e.message)
+    } finally { setPwSaving(false) }
   }
 
   function toggleCat(cat: string, list: string[], set: (v: string[]) => void) {
@@ -383,6 +405,13 @@ export default function AdminPanel() {
               onChange={e => setNewName(e.target.value)}
               placeholder="Ism (masalan: Sardor)"
             />
+            <input
+              className="field"
+              type="text"
+              value={newPassword}
+              onChange={e => setNewPassword(e.target.value)}
+              placeholder="Parol (kamida 4 belgi)"
+            />
 
             <div>
               <p className="text-xs mb-2" style={{ color: 'var(--fg-muted)' }}>Kategoriyalar:</p>
@@ -512,12 +541,34 @@ export default function AdminPanel() {
                     <CheckCircle2 size={14} /> Saqlash
                   </button>
                   <button
-                    onClick={() => setEditId(null)}
+                    onClick={() => { setEditId(null); setEditPassword(''); setPwErr('') }}
                     className="px-3 py-2 rounded-xl cursor-pointer transition-all active:scale-95"
                     style={{ background: 'var(--surface)', color: 'var(--fg-muted)', fontSize: 13 }}
                   >
                     Bekor
                   </button>
+                </div>
+
+                <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
+                  <p className="text-xs mb-2" style={{ color: 'var(--fg-muted)' }}>Parolni yangilash:</p>
+                  {pwErr && <p className="text-xs mb-2" style={{ color: 'var(--error)' }}>{pwErr}</p>}
+                  <div className="flex gap-2">
+                    <input
+                      className="field"
+                      type="text"
+                      value={editPassword}
+                      onChange={e => setEditPassword(e.target.value)}
+                      placeholder="Yangi parol (kamida 4 belgi)"
+                    />
+                    <button
+                      onClick={() => savePassword(admin.telegram_id)}
+                      disabled={pwSaving}
+                      className="px-3 py-2 rounded-xl cursor-pointer transition-all active:scale-95 flex-shrink-0"
+                      style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent-hover)', fontSize: 13, fontWeight: 500 }}
+                    >
+                      {pwSaving ? <Loader2 size={14} className="animate-spin" /> : 'O\'rnatish'}
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (

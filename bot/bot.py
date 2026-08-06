@@ -48,7 +48,7 @@ from telegram.ext import (
     CallbackQueryHandler, filters, ContextTypes
 )
 
-WEBAPP_URL = os.environ.get("WEBAPP_URL", "https://admins.eliboyev.uz")
+WEBAPP_URL = os.environ.get("WEBAPP_URL", "https://admin.eliboyev.uz")
 
 # ── Sozlamalar ────────────────────────────────────────────────────────────────
 

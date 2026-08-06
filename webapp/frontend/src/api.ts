@@ -105,7 +105,7 @@ export const api = {
 
   admins: () => request<import('./types').Admin[]>('/admins', { headers: headers() }),
 
-  createAdmin: (data: { telegram_id: number; name: string; categories: string[] }) =>
+  createAdmin: (data: { telegram_id: number; name: string; categories: string[]; password: string }) =>
     request('/admins', {
       method: 'POST',
       headers: headers(),
@@ -114,7 +114,7 @@ export const api = {
 
   updateAdmin: (
     id: number,
-    patch: { name?: string; categories?: string[]; active?: boolean }
+    patch: { name?: string; categories?: string[]; active?: boolean; password?: string }
   ) =>
     request(`/admins/${id}`, {
       method: 'PUT',
