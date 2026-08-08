@@ -228,5 +228,25 @@ def root_of(name: str) -> str:
     return resolve(name)[0]
 
 
+def roots_containing(name: str) -> list[str]:
+    """`name` (root/sub/leaf darajasidan qat'i nazar) qaysi asosiy toifa(lar)da
+    uchrashini qaytaradi. Bir nechta toifada bir xil nom bo'lishi mumkin
+    (masalan "Futbolkalar" ham "Kiyim"da, ham "Yozgi kolleksiya"da bor) —
+    shu holatlarni chaqiruvchi tomon noaniq deb bilishi uchun ishlatiladi."""
+    key = (name or "").strip().casefold()
+    if not key:
+        return []
+    roots: list[str] = []
+    for root, subs in CATEGORY_TREE.items():
+        if root.casefold() == key:
+            roots.append(root)
+            continue
+        for sub, leaves in subs.items():
+            if sub.casefold() == key or any(leaf.casefold() == key for leaf in leaves):
+                roots.append(root)
+                break
+    return roots
+
+
 def path_string(root: str, sub: str = "", leaf: str = "") -> str:
     return " > ".join([p for p in (root, sub, leaf) if p])

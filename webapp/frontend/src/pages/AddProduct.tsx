@@ -279,7 +279,7 @@ export default function AddProduct({ user }: Props) {
       if (variantEnabled && variantNames.length > 0) {
         variantNames.forEach((vn, ci) => {
           if (vn.trim()) {
-            razmerMatritsa[vn] = (sizesByColor[ci] || [])
+            razmerMatritsa[ci] = (sizesByColor[ci] || [])
               .filter(s => s.nomi.trim())
               .map(s => ({ nomi: s.nomi, narx: parseInt(s.narx) || 0 }))
           }
@@ -327,7 +327,8 @@ export default function AddProduct({ user }: Props) {
         name: form.name.trim(),
         price: priceNum,
         discount: discountNum,
-        discount_type: discountType,
+        // Backend faqat o'zbekcha literal qiymatlarni taniydi ('doimiy' / 'vaqtinchalik')
+        discount_type: discountType === 'temporary' ? 'vaqtinchalik' : 'doimiy',
         discount_expires: discountExpires || undefined,
         auto_delete: autoDelete,
         // Uchala daraja alohida yuboriladi: ruxsat cat1 (asosiy toifa) bo'yicha

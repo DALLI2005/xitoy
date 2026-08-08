@@ -87,6 +87,7 @@ from categories import (  # noqa: E402
     CATEGORY_TREE,
     path_string as category_path_string,
     resolve as resolve_category,
+    roots_containing,
 )
 
 # Sarlavha qisqartirish uchun keraksiz marketing so'zlari ro'yxati
@@ -787,6 +788,22 @@ def _verify_init_data(init_data: str) -> dict:
     return user
 
 
+async def _is_active_admin_token(token: str) -> bool:
+    """Tokenni admins jadvali bo'yicha tekshiradi — faqat mavjud va faol admin uchun True."""
+    if not token.startswith("admin_token_"):
+        return False
+    try:
+        tg_id = int(token.replace("admin_token_", ""))
+    except ValueError:
+        return False
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT active FROM admins WHERE telegram_id = ?", (tg_id,)
+        ) as cur:
+            row = await cur.fetchone()
+    return bool(row and row[0])
+
+
 async def get_current_user(
     x_init_data: Annotated[str, Header()] = "",
     x_admin_token: Annotated[str, Header()] = "",
@@ -1013,10 +1030,21 @@ class ProductIn(BaseModel):
 
 def _normalize_admin_categories(cats: list[str]) -> list[str]:
     """Admin ruxsati faqat 1-daraja (asosiy toifa) bo'yicha saqlanadi.
-    Kichik toifa yoki tovar turi kelsa — uning asosiy toifasiga keltiriladi."""
+    Kichik toifa yoki tovar turi kelsa — uning asosiy toifasiga keltiriladi.
+    Bir xil nom bir nechta asosiy toifada uchrasa (masalan "Futbolkalar"),
+    qaysi toifa nazarda tutilgani noaniq bo'lgani uchun rad etiladi —
+    aks holda admin xato asosiy toifaga ruxsat olib qo'yishi mumkin edi."""
     seen: list[str] = []
     for c in cats:
-        root = resolve_category(c)[0] if c not in CATEGORIES else c
+        if c in CATEGORIES:
+            root = c
+        else:
+            roots = roots_containing(c)
+            if len(roots) != 1:
+                raise ValueError(
+                    f"\"{c}\" toifasi noaniq yoki topilmadi — asosiy toifa nomini kiriting"
+                )
+            root = roots[0]
         if root not in seen:
             seen.append(root)
     return seen
@@ -1352,9 +1380,9 @@ async def list_products(
     x_admin_token: Annotated[str, Header()] = "",
     authorization: Annotated[str, Header()] = "",
 ):
-    # Token bo'lsa admin, bo'lmasa oddiy foydalanuvchi (hammaga ochiq)
+    # Token faol admin ekanligi tasdiqlansagina admin sifatida ko'riladi
     token = x_admin_token or (authorization.replace("Bearer ", "").strip() if authorization else "")
-    is_admin = bool(token)
+    is_admin = await _is_active_admin_token(token) if token else False
 
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
@@ -1454,14 +1482,25 @@ async def update_product(
     if not payload:
         raise HTTPException(400, "Hech narsa o'zgartirilmadi")
 
-    # Kategoriya tegilgan bo'lsa — uchala darajani ham daraxt bo'yicha qayta hisoblaymiz
-    if {"category", "subcategory", "product_type"} & payload.keys():
-        root, sub, leaf = resolve_category(
-            payload.get("category", ""), payload.get("subcategory", ""), payload.get("product_type", "")
-        )
-        payload["category"], payload["subcategory"], payload["product_type"] = root, sub, leaf
-
     async with aiosqlite.connect(DB_PATH) as db:
+        # Kategoriya tegilgan bo'lsa — uchala darajani ham daraxt bo'yicha qayta hisoblaymiz.
+        # Qisman kelgan maydonlar (masalan faqat subcategory) mavjud qiymatlar bilan
+        # to'ldiriladi, aks holda bo'sh root noto'g'ri root'ga chalkashtirib yuborishi mumkin.
+        if {"category", "subcategory", "product_type"} & payload.keys():
+            async with db.execute(
+                "SELECT category, subcategory, product_type FROM products WHERE id = ?", (product_id,)
+            ) as cur:
+                existing = await cur.fetchone()
+            if not existing:
+                raise HTTPException(404, "Tovar topilmadi")
+            existing_cat, existing_sub, existing_leaf = existing
+            root, sub, leaf = resolve_category(
+                payload.get("category", existing_cat or ""),
+                payload.get("subcategory", existing_sub or ""),
+                payload.get("product_type", existing_leaf or ""),
+            )
+            payload["category"], payload["subcategory"], payload["product_type"] = root, sub, leaf
+
         fields, values = [], []
         for k, v in payload.items():
             if isinstance(v, (list, dict)):
