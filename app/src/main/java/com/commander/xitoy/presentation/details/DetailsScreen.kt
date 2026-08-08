@@ -125,6 +125,18 @@ fun DetailsScreen(
     val availableSizes = product.razmerMatritsa[activeImg.toString()] ?: emptyList()
     var selectedSize by remember(product.id, activeImg) { mutableStateOf<com.commander.xitoy.domain.model.SizeOption?>(null) }
 
+    // Rang xususiyati — admin "Variantlar" bosqichida har bir rangga rasm biriktirgan
+    // bo'lsa, o'sha haqiqiy rasm ko'rsatiladi; aks holda oddiy rang doirasi chiziladi.
+    val rangAttrKey = product.attributes.keys.firstOrNull { it.equals("Rang", ignoreCase = true) }
+    val rangValues = rangAttrKey?.let { product.attributes[it] } ?: emptyList()
+    val rangValueToImageIndex: Map<String, Int> = if (product.variantlarYoqilgan) {
+        rangValues.mapNotNull { value ->
+            val idx = product.variantNomlari.indexOfFirst { it.equals(value, ignoreCase = true) }
+            if (idx >= 0) value to idx else null
+        }.toMap()
+    } else emptyMap()
+    var selectedRangValue by remember(product.id) { mutableStateOf(rangValues.firstOrNull()) }
+
     // Variant support
     val activeBasePrice = when {
         selectedSize != null -> selectedSize!!.narx
@@ -276,8 +288,22 @@ fun DetailsScreen(
                 }
             }
 
+            // ─── Rang tanlash — haqiqiy rasm yoki rang doirasi ─────────────────
+            if (rangValues.isNotEmpty()) {
+                RangSelector(
+                    rangValues = rangValues,
+                    selectedValue = selectedRangValue,
+                    valueToImageIndex = rangValueToImageIndex,
+                    images = images,
+                    onSelect = { value ->
+                        selectedRangValue = value
+                        rangValueToImageIndex[value]?.let { activeImg = it }
+                    }
+                )
+            }
+
             // ─── Thumbnaillar ─────────────────────────────────────────────────
-            if (images.size > 1 || product.variantlarYoqilgan) {
+            if (rangValues.isEmpty() && (images.size > 1 || product.variantlarYoqilgan)) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -333,35 +359,38 @@ fun DetailsScreen(
                         .padding(top = 14.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        "O'lcham",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = DalliText
-                    )
+                    Row {
+                        Text(
+                            "O'lcham: ",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = DalliMuted
+                        )
+                        Text(
+                            selectedSize?.nomi ?: "tanlang",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = DalliText
+                        )
+                    }
                     Row(
                         modifier = Modifier.horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         availableSizes.forEach { size ->
                             val isSelected = selectedSize?.nomi == size.nomi
-                            val chipBg by animateColorAsState(
-                                targetValue = if (isSelected) DalliPrimary else DalliSurface,
+                            val borderColor by animateColorAsState(
+                                targetValue = if (isSelected) DalliText else DalliLine,
                                 animationSpec = tween(180),
-                                label = "chip_bg"
-                            )
-                            val chipText by animateColorAsState(
-                                targetValue = if (isSelected) Color.White else DalliText,
-                                animationSpec = tween(180),
-                                label = "chip_text"
+                                label = "chip_border"
                             )
                             Column(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(chipBg)
+                                    .background(DalliSurface)
                                     .border(
-                                        width = if (isSelected) 0.dp else 1.dp,
-                                        color = DalliLine,
+                                        width = if (isSelected) 2.dp else 1.dp,
+                                        color = borderColor,
                                         shape = RoundedCornerShape(10.dp)
                                     )
                                     .clickable { selectedSize = if (isSelected) null else size }
@@ -373,14 +402,14 @@ fun DetailsScreen(
                                     text = size.nomi,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = chipText
+                                    color = DalliText
                                 )
                                 val sizeDiscountedPrice = (size.narx * (100 - product.discountPercent) / 100).toLong()
                                 Text(
                                     text = "${groupSom(sizeDiscountedPrice)} so'm",
                                     fontSize = 10.5.sp,
                                     fontWeight = FontWeight.Normal,
-                                    color = if (isSelected) Color.White.copy(alpha = 0.85f) else DalliMuted
+                                    color = DalliMuted
                                 )
                             }
                         }
@@ -520,8 +549,15 @@ fun DetailsScreen(
                 }
 
                 // Xususiyatlar — admin tanlagan rang / o'lcham / xotira va h.k.
-                if (product.attributes.isNotEmpty()) {
-                    AttributesSection(attributes = product.attributes)
+                // Rang va o'lcham yuqorida alohida (haqiqiy rasm/narx bilan) ko'rsatilgani
+                // uchun bu yerda takrorlanmaydi.
+                val otherAttributes = product.attributes.filterKeys { key ->
+                    val isRang = key.equals("Rang", ignoreCase = true)
+                    val isSizeLike = key.normalizeUz().contains("olcham") && availableSizes.isNotEmpty()
+                    !isRang && !isSizeLike
+                }
+                if (otherAttributes.isNotEmpty()) {
+                    AttributesSection(attributes = otherAttributes)
                 }
 
                 // Tavsifnoma — barcha texnik ma'lumotlar jadvali
@@ -812,6 +848,71 @@ private fun AttributeChip(name: String, value: String) {
             fontWeight = FontWeight.SemiBold,
             color = DalliTextSecondary
         )
+    }
+}
+
+private fun String.normalizeUz(): String =
+    this.lowercase().replace("'", "").replace("’", "").replace("ʻ", "")
+
+/**
+ * Rang tanlash — "Rang: {tanlangan}" sarlavhasi va pastda kvadrat swatchlar.
+ * Admin "Variantlar" bosqichida shu rangga mos rasm biriktirgan bo'lsa, o'sha
+ * haqiqiy rasm ko'rsatiladi; aks holda oddiy rang doirasi chiziladi.
+ */
+@Composable
+private fun RangSelector(
+    rangValues: List<String>,
+    selectedValue: String?,
+    valueToImageIndex: Map<String, Int>,
+    images: List<String>,
+    onSelect: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .padding(top = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row {
+            Text("Rang: ", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = DalliMuted)
+            Text(selectedValue ?: "", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = DalliText)
+        }
+        Row(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            rangValues.forEach { value ->
+                val isSelected = value == selectedValue
+                val imgIdx = valueToImageIndex[value]
+                val swatchColor = if (imgIdx == null) colorSwatchFor(value) else null
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(swatchColor ?: DalliSurfaceAlt)
+                        .border(
+                            width = if (isSelected) 2.dp else 1.dp,
+                            color = if (isSelected) DalliText else DalliLine,
+                            shape = RoundedCornerShape(14.dp)
+                        )
+                        .clickable { onSelect(value) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (imgIdx != null) {
+                        AsyncImage(
+                            model = images.getOrNull(imgIdx),
+                            contentDescription = value,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .matchParentSize()
+                                .padding(if (isSelected) 3.dp else 0.dp)
+                                .clip(RoundedCornerShape(11.dp))
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
