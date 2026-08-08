@@ -62,7 +62,9 @@ APPS_SCRIPT_URL      = os.environ.get("APPS_SCRIPT_URL", "")
 IMGBB_API_KEY        = os.environ.get("IMGBB_API_KEY", "")
 UPLOADS_DIR          = Path(os.environ.get("UPLOADS_DIR", "/opt/xitoy_webapp/uploads"))
 SITE_BASE_URL        = os.environ.get("SITE_BASE_URL", "https://admin.eliboyev.uz")
-DB_PATH              = os.environ.get("DB_PATH", "admins.db")
+PRODUCTS_DB_PATH     = os.environ.get("PRODUCTS_DB_PATH", "products.db")
+ADMINS_DB_PATH       = os.environ.get("ADMINS_DB_PATH", "admins.db")
+USERS_DB_PATH        = os.environ.get("USERS_DB_PATH", "users.db")
 APPS_SCRIPT_SECRET   = os.environ.get("APPS_SCRIPT_SECRET", "")
 ALLOWED_ORIGINS      = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", SITE_BASE_URL).split(",") if o.strip()]
 
@@ -319,7 +321,14 @@ async def _migrate_product_categories(db) -> None:
 
 
 async def init_db():
-    async with aiosqlite.connect(DB_PATH) as db:
+    await _init_admins_db()
+    await _init_users_db()
+    await _init_products_db()
+
+
+async def _init_admins_db():
+    """admins.db — admins va channels jadvallari (tizim/admin konfiguratsiyasi)."""
+    async with aiosqlite.connect(ADMINS_DB_PATH) as db:
         await db.execute(f"""
             CREATE TABLE IF NOT EXISTS admins (
                 telegram_id  INTEGER PRIMARY KEY,
@@ -350,6 +359,17 @@ async def init_db():
                 created_at TEXT    DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        # Superadmin — barcha kategoriyalar
+        await db.execute("""
+            INSERT OR IGNORE INTO admins (telegram_id, name, categories)
+            VALUES (?, ?, ?)
+        """, (SUPERADMIN_ID, "Superadmin", json.dumps(CATEGORIES)))
+        await db.commit()
+
+
+async def _init_users_db():
+    """users.db — app_users va favorites jadvallari (oddiy mijozlar)."""
+    async with aiosqlite.connect(USERS_DB_PATH) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS favorites (
                 telegram_id  INTEGER NOT NULL,
@@ -374,7 +394,12 @@ async def init_db():
         """)
         await db.execute("CREATE INDEX IF NOT EXISTS idx_app_users_phone ON app_users(phone)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_app_users_token ON app_users(session_token)")
+        await db.commit()
 
+
+async def _init_products_db():
+    """products.db — faqat products jadvali."""
+    async with aiosqlite.connect(PRODUCTS_DB_PATH) as db:
         await db.execute("""
             CREATE TABLE IF NOT EXISTS products (
                 id                   INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -426,11 +451,6 @@ async def init_db():
         except aiosqlite.OperationalError:
             pass
         await _migrate_product_categories(db)
-        # Superadmin — barcha kategoriyalar
-        await db.execute("""
-            INSERT OR IGNORE INTO admins (telegram_id, name, categories)
-            VALUES (?, ?, ?)
-        """, (SUPERADMIN_ID, "Superadmin", json.dumps(CATEGORIES)))
         await db.commit()
 
 
@@ -562,7 +582,7 @@ async def register_user(data: RegisterIn):
     pwd_hash = await asyncio.to_thread(_hash_password, password, salt)
     token = secrets.token_hex(32)
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(USERS_DB_PATH) as db:
         async with db.execute(
             "SELECT user_id FROM app_users WHERE phone = ?", (phone,)
         ) as cur:
@@ -614,7 +634,7 @@ async def register_user(data: RegisterIn):
 async def login_password(data: LoginIn):
     phone = _normalize_phone(data.phone)
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(USERS_DB_PATH) as db:
         async with db.execute(
             "SELECT user_id, fullname, password_hash, salt FROM app_users WHERE phone = ?",
             (phone,),
@@ -630,7 +650,7 @@ async def login_password(data: LoginIn):
         raise HTTPException(401, "Parol noto'g'ri")
 
     token = secrets.token_hex(32)
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(USERS_DB_PATH) as db:
         await db.execute(
             "UPDATE app_users SET session_token = ? WHERE user_id = ?",
             (token, user_id),
@@ -657,7 +677,7 @@ async def change_password(data: ChangePasswordIn):
     if len(data.new_password) < 6:
         raise HTTPException(400, "Yangi parol kamida 6 belgidan iborat bo'lishi kerak")
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(USERS_DB_PATH) as db:
         async with db.execute(
             "SELECT password_hash, salt FROM app_users WHERE user_id = ?",
             (data.user_id,),
@@ -700,7 +720,7 @@ async def admin_login(data: AdminLoginIn):
 
     tg_id = int(tg_id_str)
     
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(ADMINS_DB_PATH) as db:
         async with db.execute(
             "SELECT name, categories, active, password FROM admins WHERE telegram_id = ?", (tg_id,)
         ) as cur:
@@ -735,7 +755,7 @@ async def webapp_login(data: WebAppLoginIn):
     tg = _verify_init_data(data.init_data)
     tg_id = int(tg["id"])
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(ADMINS_DB_PATH) as db:
         async with db.execute(
             "SELECT name, categories, active FROM admins WHERE telegram_id = ?", (tg_id,)
         ) as cur:
@@ -796,7 +816,7 @@ async def _is_active_admin_token(token: str) -> bool:
         tg_id = int(token.replace("admin_token_", ""))
     except ValueError:
         return False
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(ADMINS_DB_PATH) as db:
         async with db.execute(
             "SELECT active FROM admins WHERE telegram_id = ?", (tg_id,)
         ) as cur:
@@ -816,7 +836,7 @@ async def get_current_user(
         if token.startswith("admin_token_"):
             try:
                 tg_id = int(token.replace("admin_token_", ""))
-                async with aiosqlite.connect(DB_PATH) as db:
+                async with aiosqlite.connect(ADMINS_DB_PATH) as db:
                     async with db.execute(
                         "SELECT name, categories, active FROM admins WHERE telegram_id = ?", (tg_id,)
                     ) as cur:
@@ -839,7 +859,7 @@ async def get_current_user(
         tg = _verify_init_data(x_init_data)
         tg_id = int(tg["id"])
 
-        async with aiosqlite.connect(DB_PATH) as db:
+        async with aiosqlite.connect(ADMINS_DB_PATH) as db:
             async with db.execute(
                 "SELECT name, categories, active FROM admins WHERE telegram_id = ?", (tg_id,)
             ) as cur:
@@ -1238,7 +1258,7 @@ async def channel_post(
     discount: int, discount_type: str, discount_expires: str, product_id
 ) -> int:
     """Bazadagi barcha yoqilgan kanallarga post yuboradi."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(ADMINS_DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute("SELECT channel_id FROM channels WHERE enabled = 1")
         rows = await cur.fetchall()
@@ -1290,7 +1310,7 @@ async def _channel_post_task(
     )
     if msg_id and product_id is not None:
         try:
-            async with aiosqlite.connect(DB_PATH) as db:
+            async with aiosqlite.connect(PRODUCTS_DB_PATH) as db:
                 await db.execute(
                     "UPDATE products SET telegram_message_id = ? WHERE id = ?",
                     (msg_id, product_id),
@@ -1304,7 +1324,7 @@ async def check_temporary_discounts():
     """Har 5 daqiqada muddati o'tgan vaqtinchalik chegirmalarni tekshiradi:
     auto_delete=1 bo'lsa mahsulot va kanal posti o'chiriladi, aks holda chegirma 0 ga tushiriladi."""
     now = datetime.now(_UZB_TZ)
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(PRODUCTS_DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute(
             "SELECT id, name, discount, auto_delete, discount_expires, telegram_message_id "
@@ -1327,8 +1347,11 @@ async def check_temporary_discounts():
 
             if row["auto_delete"]:
                 if row["telegram_message_id"]:
-                    cur2 = await db.execute("SELECT channel_id FROM channels WHERE enabled = 1")
-                    channels = await cur2.fetchall()
+                    # channels admins.db da — alohida ulanish kerak, products.db bilan bir xil emas
+                    async with aiosqlite.connect(ADMINS_DB_PATH) as admins_db:
+                        admins_db.row_factory = aiosqlite.Row
+                        cur2 = await admins_db.execute("SELECT channel_id FROM channels WHERE enabled = 1")
+                        channels = await cur2.fetchall()
                     for ch in channels:
                         await asyncio.to_thread(
                             _tg_delete_channel_message, ch["channel_id"], row["telegram_message_id"]
@@ -1384,7 +1407,7 @@ async def list_products(
     token = x_admin_token or (authorization.replace("Bearer ", "").strip() if authorization else "")
     is_admin = await _is_active_admin_token(token) if token else False
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(PRODUCTS_DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("SELECT * FROM products ORDER BY id DESC") as cur:
             rows = await cur.fetchall()
@@ -1455,7 +1478,7 @@ async def patch_product(
     if patch.active is None and patch.in_stock is None:
         raise HTTPException(400, "Hech narsa o'zgartirilmadi")
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(PRODUCTS_DB_PATH) as db:
         if patch.active is not None:
             await db.execute("UPDATE products SET active = ? WHERE id = ?", (1 if patch.active else 0, product_id))
         if patch.in_stock is not None:
@@ -1482,7 +1505,7 @@ async def update_product(
     if not payload:
         raise HTTPException(400, "Hech narsa o'zgartirilmadi")
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(PRODUCTS_DB_PATH) as db:
         # Kategoriya tegilgan bo'lsa — uchala darajani ham daraxt bo'yicha qayta hisoblaymiz.
         # Qisman kelgan maydonlar (masalan faqat subcategory) mavjud qiymatlar bilan
         # to'ldiriladi, aks holda bo'sh root noto'g'ri root'ga chalkashtirib yuborishi mumkin.
@@ -1522,7 +1545,7 @@ async def delete_product(
     product_id: int,
     user: dict = Depends(require_super),
 ):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(PRODUCTS_DB_PATH) as db:
         await db.execute("DELETE FROM products WHERE id = ?", (product_id,))
         await db.commit()
     await notify(f"🗑 Tovar #{product_id} <b>o'chirildi</b> ({user['name']})")
@@ -1531,7 +1554,7 @@ async def delete_product(
 
 @app.delete("/api/admin/clear-all-products")
 async def clear_all_products(user: dict = Depends(require_super)):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(PRODUCTS_DB_PATH) as db:
         await db.execute("DELETE FROM products")
         await db.commit()
     return {"ok": True, "message": "Barcha tovarlar o'chirildi"}
@@ -1557,7 +1580,7 @@ async def add_product(product: ProductIn, user: dict = Depends(get_current_user)
     var_narx_json = json.dumps(product.variant_narxlari or [])
     razmer_json = json.dumps(product.razmer_matritsa or {})
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(PRODUCTS_DB_PATH) as db:
         cur = await db.execute(
             """
             INSERT INTO products (
@@ -1621,7 +1644,7 @@ async def upload_image(
 # ── /api/admins (superadmin) ───────────────────────────────────────────────────
 @app.get("/api/admins")
 async def list_admins(_: dict = Depends(require_super)):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(ADMINS_DB_PATH) as db:
         async with db.execute(
             "SELECT telegram_id, name, categories, active, created_at FROM admins ORDER BY created_at"
         ) as cur:
@@ -1641,7 +1664,7 @@ async def list_admins(_: dict = Depends(require_super)):
 
 @app.post("/api/admins", status_code=201)
 async def create_admin(admin: AdminIn, _: dict = Depends(require_super)):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(ADMINS_DB_PATH) as db:
         try:
             await db.execute(
                 "INSERT INTO admins (telegram_id, name, categories, password) VALUES (?, ?, ?, ?)",
@@ -1686,7 +1709,7 @@ async def update_admin(telegram_id: int, patch: AdminPatch, _: dict = Depends(re
         raise HTTPException(400, "Hech narsa o'zgartirilmadi")
 
     values.append(telegram_id)
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(ADMINS_DB_PATH) as db:
         await db.execute(f"UPDATE admins SET {', '.join(fields)} WHERE telegram_id = ?", values)
         await db.commit()
     return {"ok": True}
@@ -1696,7 +1719,7 @@ async def update_admin(telegram_id: int, patch: AdminPatch, _: dict = Depends(re
 async def delete_admin(telegram_id: int, _: dict = Depends(require_super)):
     if telegram_id == SUPERADMIN_ID:
         raise HTTPException(403, "Superadminni o'chirish mumkin emas")
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(ADMINS_DB_PATH) as db:
         await db.execute("DELETE FROM admins WHERE telegram_id = ?", (telegram_id,))
         await db.commit()
     return {"ok": True}
@@ -1710,7 +1733,7 @@ class ChannelIn(BaseModel):
 
 @app.get("/api/channels")
 async def get_channels(_: dict = Depends(require_super)):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(ADMINS_DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute("SELECT * FROM channels ORDER BY created_at")
         rows = await cur.fetchall()
@@ -1739,7 +1762,7 @@ async def add_channel(ch: ChannelIn, _: dict = Depends(require_super)):
         raise HTTPException(400, f"Telegram xatosi: {e}")
     label = ch.label.strip() or chat_title
     try:
-        async with aiosqlite.connect(DB_PATH) as db:
+        async with aiosqlite.connect(ADMINS_DB_PATH) as db:
             await db.execute(
                 "INSERT INTO channels (channel_id, label) VALUES (?, ?)", (cid, label)
             )
@@ -1750,14 +1773,14 @@ async def add_channel(ch: ChannelIn, _: dict = Depends(require_super)):
 
 @app.patch("/api/channels/{ch_id}/toggle")
 async def toggle_channel(ch_id: int, _: dict = Depends(require_super)):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(ADMINS_DB_PATH) as db:
         await db.execute("UPDATE channels SET enabled = 1 - enabled WHERE id = ?", (ch_id,))
         await db.commit()
     return {"ok": True}
 
 @app.delete("/api/channels/{ch_id}")
 async def delete_channel(ch_id: int, _: dict = Depends(require_super)):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(ADMINS_DB_PATH) as db:
         await db.execute("DELETE FROM channels WHERE id = ?", (ch_id,))
         await db.commit()
     return {"ok": True}
@@ -1778,7 +1801,7 @@ async def get_stats(_: dict = Depends(require_super)):
         key = p.get("added_by_name") or p.get("added_by") or "Noma'lum"
         by_admin[key] = by_admin.get(key, 0) + 1
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(ADMINS_DB_PATH) as db:
         async with db.execute("SELECT COUNT(*) FROM admins WHERE active = 1") as cur:
             (active_admins,) = await cur.fetchone()
 
@@ -1938,7 +1961,7 @@ async def list_orders(telegram_id: str):
 @app.get("/api/favorites")
 async def list_favorites(telegram_id: int):
     """Foydalanuvchining sevimli mahsulotlari ro'yxati."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(USERS_DB_PATH) as db:
         async with db.execute(
             "SELECT product_id FROM favorites WHERE telegram_id = ? ORDER BY created_at DESC",
             (telegram_id,)
@@ -1952,7 +1975,7 @@ async def list_favorites(telegram_id: int):
 @app.post("/api/favorites/{product_id}")
 async def add_favorite(product_id: str, telegram_id: int):
     """Mahsulotni sevimlilarga qo'shish."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(USERS_DB_PATH) as db:
         await db.execute(
             "INSERT OR IGNORE INTO favorites (telegram_id, product_id) VALUES (?, ?)",
             (telegram_id, product_id)
@@ -1964,7 +1987,7 @@ async def add_favorite(product_id: str, telegram_id: int):
 @app.delete("/api/favorites/{product_id}")
 async def remove_favorite(product_id: str, telegram_id: int):
     """Mahsulotni sevimlilardan olib tashlash."""
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(USERS_DB_PATH) as db:
         await db.execute(
             "DELETE FROM favorites WHERE telegram_id = ? AND product_id = ?",
             (telegram_id, product_id)
