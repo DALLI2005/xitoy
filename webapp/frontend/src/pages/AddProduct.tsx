@@ -190,15 +190,19 @@ export default function AddProduct({ user }: Props) {
   const cat2Options = cat1 ? Object.keys(categoryTree[cat1] || {}) : []
   const cat3Options = cat1 && cat2 ? (categoryTree[cat1]?.[cat2] || []) : []
 
-  // Kategoriya o'zgarganda quyi darajalarni tozalash
+  // Kategoriya o'zgarganda quyi darajalarni va tanlangan atributlarni tozalash
+  // (atributlar oldingi kategoriyaga xos bo'lgani uchun yangisiga o'tmasligi kerak)
   function handleCat1Change(val: string) {
     setCat1(val); setCat2(''); setCat3(''); setCatConfirmed(false)
+    setSelectedAttributes({}); setActiveAttributes([])
   }
   function handleCat2Change(val: string) {
     setCat2(val); setCat3(''); setCatConfirmed(false)
+    setSelectedAttributes({}); setActiveAttributes([])
   }
   function handleCat3Change(val: string) {
     setCat3(val); setCatConfirmed(false)
+    setSelectedAttributes({}); setActiveAttributes([])
   }
   function confirmCategory() {
     if (!cat1 || !cat2 || !cat3) return

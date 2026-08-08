@@ -303,7 +303,10 @@ fun DetailsScreen(
             }
 
             // ─── Thumbnaillar ─────────────────────────────────────────────────
-            if (rangValues.isEmpty() && (images.size > 1 || product.variantlarYoqilgan)) {
+            // Rang tanlovchi haqiqiy rasmlarga bog'langan bo'lsagina (valueToImageIndex
+            // to'la) u orqali barcha rasmlarni ko'rish mumkin; aks holda (rang faqat
+            // ma'lumot yoki rasmga bog'lanmagan) thumbnaillar hamon kerak.
+            if (rangValueToImageIndex.isEmpty() && (images.size > 1 || product.variantlarYoqilgan)) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -908,6 +911,19 @@ private fun RangSelector(
                                 .matchParentSize()
                                 .padding(if (isSelected) 3.dp else 0.dp)
                                 .clip(RoundedCornerShape(11.dp))
+                        )
+                    } else if (swatchColor == null) {
+                        // Nomi rang lug'atida yo'q — rasm ham, doira ham chizib bo'lmaydi,
+                        // shuning uchun kamida matn bilan farqlash kerak.
+                        Text(
+                            text = value,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = DalliText,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(4.dp)
                         )
                     }
                 }

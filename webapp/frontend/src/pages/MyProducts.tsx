@@ -181,7 +181,11 @@ export default function MyProducts({ user }: Props) {
               category: editForm.category,
               subcategory: editForm.subcategory,
               product_type: editForm.product_type,
-              description: editForm.description.trim() }
+              description: editForm.description.trim(),
+              variantlarYoqilgan: editForm.variantlar_yoqilgan,
+              variantNomlari: editForm.variant_nomlari,
+              variantNarxlari: editForm.variant_narxlari.map(s => parseInt(s) || 0),
+              razmerMatritsa: editForm.variantlar_yoqilgan ? razmerMatritsa : {} }
           : p
       ))
       setEditProduct(null)

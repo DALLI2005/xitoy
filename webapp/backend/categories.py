@@ -189,7 +189,9 @@ def is_valid_path(root: str, sub: str = "", leaf: str = "") -> bool:
     if root not in CATEGORY_TREE:
         return False
     if not sub:
-        return True
+        # sub bo'lmasa, leaf ham bo'lmasligi kerak — aks holda leaf
+        # tekshirilmay, tasdiqlanmagan qiymat sifatida o'tib ketadi.
+        return not leaf
     if sub not in CATEGORY_TREE[root]:
         return False
     if not leaf:
