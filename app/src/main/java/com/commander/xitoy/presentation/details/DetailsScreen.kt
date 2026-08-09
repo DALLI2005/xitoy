@@ -13,11 +13,18 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.draw.scale
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -310,10 +317,13 @@ fun DetailsScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 16.dp, end = 16.dp, top = 12.dp),
+                        .padding(start = 16.dp, end = 16.dp, top = 12.dp)
+                        .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    images.take(4).forEachIndexed { i, img ->
+                    // Chegara yo'q — admin nechta rasm qo'shgan bo'lsa, hammasi
+                    // ko'rinadi (qatorga sig'masa gorizontal skroll bilan).
+                    images.forEachIndexed { i, img ->
                         val selected = activeImg == i
                         val thumbScale by animateFloatAsState(
                             targetValue = if (selected) 1.1f else 1f,
@@ -326,14 +336,14 @@ fun DetailsScreen(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(66.dp)
+                                    .size(52.dp)
                                     .scale(thumbScale)
-                                    .clip(RoundedCornerShape(13.dp))
+                                    .clip(RoundedCornerShape(11.dp))
                                     .background(DalliSurfaceAlt)
                                     .border(
                                         width = if (selected) 2.dp else 1.dp,
                                         color = if (selected) DalliPrimary else DalliLine,
-                                        shape = RoundedCornerShape(13.dp)
+                                        shape = RoundedCornerShape(11.dp)
                                     )
                                     .clickable { activeImg = i }
                             ) {
@@ -341,7 +351,7 @@ fun DetailsScreen(
                                     model = img,
                                     contentDescription = null,
                                     contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(13.dp))
+                                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(11.dp))
                                 )
                             }
                             if (product.variantlarYoqilgan && i < product.variantNomlari.size && product.variantNomlari[i].isNotBlank()) {
@@ -371,6 +381,21 @@ fun DetailsScreen(
                         rangValueToImageIndex[value]?.let { activeImg = it }
                     }
                 )
+            }
+
+            // ─── Boshqa xususiyatlar — Rang tanlashdan DARHOL KEYIN, narx
+            // blokidan oldin, ketma-ket to'plangan holda. Rang va o'lcham
+            // yuqorida alohida (haqiqiy rasm/narx bilan) ko'rsatilgani uchun
+            // bu yerda takrorlanmaydi.
+            val otherAttributes = product.attributes.filterKeys { key ->
+                val isRang = key.equals("Rang", ignoreCase = true)
+                val isSizeLike = key.normalizeUz().contains("olcham") && availableSizes.isNotEmpty()
+                !isRang && !isSizeLike
+            }
+            if (otherAttributes.isNotEmpty()) {
+                Box(modifier = Modifier.padding(horizontal = 16.dp).padding(top = 14.dp)) {
+                    AttributesSection(attributes = otherAttributes)
+                }
             }
 
             // ─── Razmer tanlash ───────────────────────────────────────────────
@@ -498,7 +523,7 @@ fun DetailsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f, fill = false)) {
                         Text(
                             "Narx · 1 dona",
                             fontSize = 11.5.sp,
@@ -535,11 +560,16 @@ fun DetailsScreen(
                                 .background(DalliPrimary)
                                 .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
+                            // Narx ustuni weight(fill=false) bilan cheklangani uchun bu
+                            // badge doim o'z tabiiy kengligini oladi; maxLines/softWrap —
+                            // ikki xonali foizlarda ham qator buzilishidan qo'shimcha himoya.
                             Text(
                                 "-${product.discountPercent}%",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.ExtraBold,
-                                color = Color.White
+                                color = Color.White,
+                                maxLines = 1,
+                                softWrap = false
                             )
                         }
                     }
@@ -569,18 +599,6 @@ fun DetailsScreen(
                             tone = DalliSuccess
                         )
                     }
-                }
-
-                // Xususiyatlar — admin tanlagan rang / o'lcham / xotira va h.k.
-                // Rang va o'lcham yuqorida alohida (haqiqiy rasm/narx bilan) ko'rsatilgani
-                // uchun bu yerda takrorlanmaydi.
-                val otherAttributes = product.attributes.filterKeys { key ->
-                    val isRang = key.equals("Rang", ignoreCase = true)
-                    val isSizeLike = key.normalizeUz().contains("olcham") && availableSizes.isNotEmpty()
-                    !isRang && !isSizeLike
-                }
-                if (otherAttributes.isNotEmpty()) {
-                    AttributesSection(attributes = otherAttributes)
                 }
 
                 // Tavsifnoma — barcha texnik ma'lumotlar jadvali
@@ -1184,9 +1202,36 @@ private fun FullScreenImageViewer(
 }
 
 /**
+ * Faqat 2+ barmoq bosilgandagina pinch-to-zoom sifatida ishlaydi. Bitta
+ * barmoqli teginish/harakatni HECH QACHON consume qilmaydi — shu sababli
+ * uni o'rab turgan HorizontalPager bitta barmoqli swipe'ni erkin oladi.
+ */
+private suspend fun PointerInputScope.detectMultitouchZoom(
+    onGesture: (zoom: Float, pan: Offset) -> Unit
+) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false)
+        do {
+            val event = awaitPointerEvent()
+            if (event.changes.size >= 2) {
+                val zoomChange = event.calculateZoom()
+                val panChange = event.calculatePan()
+                if (zoomChange != 1f || panChange != Offset.Zero) {
+                    onGesture(zoomChange, panChange)
+                }
+                event.changes.forEach { if (it.positionChanged()) it.consume() }
+            }
+        } while (event.changes.any { it.pressed })
+    }
+}
+
+/**
  * Bitta rasm — double-tap bilan zoom in/out (1x <-> 2.5x) va pinch-to-zoom
- * (1x..4x) qo'llab-quvvatlaydi. Zoom qilinganda pan (surish) ham ishlaydi;
- * shu sababli tashqi HorizontalPager zoom paytida o'chiriladi (onZoomChange).
+ * (1x..4x) qo'llab-quvvatlaydi. Zoom qilinmagan holatda (scale=1f) bitta
+ * barmoqli gorizontal surish HECH QANDAY gesture bilan tutib qolinmaydi —
+ * shuning uchun tashqi HorizontalPager swipe qila oladi. Faqat zoom
+ * qilingandan keyin bitta barmoqli surish rasmni pan qiladi (alohida,
+ * shart bilan qo'shiladigan pointerInput orqali).
  */
 @Composable
 private fun ZoomableImage(
@@ -1197,12 +1242,13 @@ private fun ZoomableImage(
     var scale by remember { mutableFloatStateOf(1f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
+    val isZoomed = scale > 1.01f
 
     val animatedScale by animateFloatAsState(targetValue = scale, animationSpec = tween(220), label = "zoom_scale")
     val animatedOffsetX by animateFloatAsState(targetValue = offsetX, animationSpec = tween(220), label = "zoom_offset_x")
     val animatedOffsetY by animateFloatAsState(targetValue = offsetY, animationSpec = tween(220), label = "zoom_offset_y")
 
-    LaunchedEffect(scale) { onZoomChange(scale > 1.05f) }
+    LaunchedEffect(isZoomed) { onZoomChange(isZoomed) }
 
     Box(
         modifier = Modifier
@@ -1222,18 +1268,31 @@ private fun ZoomableImage(
                 )
             }
             .pointerInput(Unit) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    val newScale = (scale * zoom).coerceIn(1f, 4f)
+                detectMultitouchZoom { zoomChange, panChange ->
+                    val newScale = (scale * zoomChange).coerceIn(1f, 4f)
                     scale = newScale
                     if (newScale > 1f) {
-                        offsetX += pan.x
-                        offsetY += pan.y
+                        offsetX += panChange.x
+                        offsetY += panChange.y
                     } else {
                         offsetX = 0f
                         offsetY = 0f
                     }
                 }
-            },
+            }
+            .then(
+                if (isZoomed) {
+                    Modifier.pointerInput(Unit) {
+                        detectDragGestures { change, dragAmount ->
+                            change.consume()
+                            offsetX += dragAmount.x
+                            offsetY += dragAmount.y
+                        }
+                    }
+                } else {
+                    Modifier
+                }
+            ),
         contentAlignment = Alignment.Center
     ) {
         AsyncImage(
