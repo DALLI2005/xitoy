@@ -1725,6 +1725,30 @@ async def delete_admin(telegram_id: int, _: dict = Depends(require_super)):
     return {"ok": True}
 
 
+# ── /api/app-users (superadmin) — mijozlar (ilova orqali ro'yxatdan o'tganlar) ──
+@app.get("/api/app-users")
+async def list_app_users(_: dict = Depends(require_super)):
+    """Faqat superadmin ko'radi. password_hash/salt/session_token hech qachon qaytmaydi."""
+    async with aiosqlite.connect(USERS_DB_PATH) as db:
+        async with db.execute(
+            "SELECT user_id, phone, fullname, created_at FROM app_users ORDER BY created_at DESC"
+        ) as cur:
+            rows = await cur.fetchall()
+    return [
+        {"user_id": r[0], "phone": r[1], "fullname": r[2], "created_at": r[3]}
+        for r in rows
+    ]
+
+
+@app.delete("/api/app-users/{user_id}")
+async def delete_app_user(user_id: int, _: dict = Depends(require_super)):
+    async with aiosqlite.connect(USERS_DB_PATH) as db:
+        await db.execute("DELETE FROM app_users WHERE user_id = ?", (user_id,))
+        await db.execute("DELETE FROM favorites WHERE telegram_id = ?", (user_id,))
+        await db.commit()
+    return {"ok": True}
+
+
 # ── /api/channels ──────────────────────────────────────────────────────────────
 
 class ChannelIn(BaseModel):

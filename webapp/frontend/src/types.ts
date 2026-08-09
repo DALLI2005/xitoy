@@ -44,6 +44,13 @@ export interface Admin {
   is_superadmin: boolean
 }
 
+export interface AppUser {
+  user_id:    number
+  phone:      string
+  fullname:   string
+  created_at: number
+}
+
 export interface Order {
   order_id:      string
   telegram_id:   string
@@ -56,4 +63,4 @@ export interface Order {
   sana:          string
 }
 
-export type Page = 'add' | 'list' | 'admins' | 'orders'
+export type Page = 'add' | 'list' | 'admins' | 'orders' | 'users'

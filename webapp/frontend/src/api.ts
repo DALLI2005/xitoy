@@ -220,6 +220,11 @@ export const api = {
       headers: headers(),
     }),
 
+  appUsers: () => request<import('./types').AppUser[]>('/app-users', { headers: headers() }),
+
+  deleteAppUser: (userId: number) =>
+    request(`/app-users/${userId}`, { method: 'DELETE', headers: headers() }),
+
   translateAndShorten: (text: string) =>
     request<{ translated_full: string; translated_short: string }>('/admin/translate', {
       method: 'POST',

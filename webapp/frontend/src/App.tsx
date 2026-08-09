@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Plus, Package, Settings, ShoppingBag, LogOut, ShieldCheck, User as UserIcon, Menu, X } from 'lucide-react'
+import { Plus, Package, Settings, ShoppingBag, LogOut, ShieldCheck, User as UserIcon, Menu, X, Users } from 'lucide-react'
 import { api } from './api'
 import Login from './pages/Login'
 import AddProduct from './pages/AddProduct'
 import MyProducts from './pages/MyProducts'
 import AdminPanel from './pages/AdminPanel'
 import OrdersPage from './pages/OrdersPage'
+import AppUsers from './pages/AppUsers'
 import type { User, Page } from './types'
 
 export default function App() {
@@ -68,6 +69,7 @@ export default function App() {
     { id: 'add',    label: "Tovar qo'shish",   icon: Plus        },
     { id: 'orders', label: 'Buyurtmalar',icon: ShoppingBag },
     ...(user.is_superadmin ? [{ id: 'admins' as Page, label: 'Xodimlar (Adminlar)', icon: Settings }] : []),
+    ...(user.is_superadmin ? [{ id: 'users' as Page, label: 'Mijozlar', icon: Users }] : []),
   ]
 
   return (
@@ -171,6 +173,7 @@ export default function App() {
             {page === 'list'   && <MyProducts user={user} />}
             {page === 'orders' && <OrdersPage />}
             {page === 'admins' && user.is_superadmin && <AdminPanel />}
+            {page === 'users'  && user.is_superadmin && <AppUsers />}
           </div>
         </main>
       </div>
