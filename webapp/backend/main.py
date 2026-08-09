@@ -1749,6 +1749,39 @@ async def delete_app_user(user_id: int, _: dict = Depends(require_super)):
     return {"ok": True}
 
 
+class AppUserPasswordReset(BaseModel):
+    new_password: str
+
+
+@app.post("/api/app-users/{user_id}/reset-password")
+async def reset_app_user_password(
+    user_id: int, data: AppUserPasswordReset, _: dict = Depends(require_super)
+):
+    """Mijoz parolini eski parolni bilmasdan qayta o'rnatadi (forgot-password holati).
+    /auth/change-password dan farqi — eski parol tekshirilmaydi, faqat superadmin chaqira oladi."""
+    if len(data.new_password) < 6:
+        raise HTTPException(400, "Yangi parol kamida 6 belgidan iborat bo'lishi kerak")
+
+    async with aiosqlite.connect(USERS_DB_PATH) as db:
+        async with db.execute(
+            "SELECT user_id FROM app_users WHERE user_id = ?", (user_id,)
+        ) as cur:
+            row = await cur.fetchone()
+        if not row:
+            raise HTTPException(404, "Foydalanuvchi topilmadi")
+
+        new_salt = secrets.token_hex(16)
+        new_hash = await asyncio.to_thread(_hash_password, data.new_password, new_salt)
+        new_token = secrets.token_hex(32)
+        await db.execute(
+            "UPDATE app_users SET password_hash = ?, salt = ?, session_token = ? WHERE user_id = ?",
+            (new_hash, new_salt, new_token, user_id),
+        )
+        await db.commit()
+
+    return {"ok": True}
+
+
 # ── /api/channels ──────────────────────────────────────────────────────────────
 
 class ChannelIn(BaseModel):

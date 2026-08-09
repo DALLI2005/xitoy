@@ -225,6 +225,13 @@ export const api = {
   deleteAppUser: (userId: number) =>
     request(`/app-users/${userId}`, { method: 'DELETE', headers: headers() }),
 
+  resetAppUserPassword: (userId: number, newPassword: string) =>
+    request<{ ok: boolean }>(`/app-users/${userId}/reset-password`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ new_password: newPassword }),
+    }),
+
   translateAndShorten: (text: string) =>
     request<{ translated_full: string; translated_short: string }>('/admin/translate', {
       method: 'POST',
