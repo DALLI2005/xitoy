@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Users, Search, Trash2, Loader2, AlertCircle, Phone, KeyRound, Wand2, Copy, CheckCircle2, X } from 'lucide-react'
+import {
+  Users, Search, Trash2, Loader2, AlertCircle, Phone, KeyRound, Wand2, Copy, CheckCircle2, X,
+  Heart, ChevronLeft, ChevronRight, Calendar,
+} from 'lucide-react'
 import { api } from '../api'
 import { hapticSuccess, hapticError } from '../telegram'
-import type { AppUser } from '../types'
+import type { AppUser, AppUserSort } from '../types'
 
 // Chalkash bo'lishi mumkin bo'lgan belgilar (0/O, 1/I/l) chiqarib tashlangan
 const PASSWORD_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
@@ -12,11 +15,29 @@ function generatePassword(length = 10): string {
   return Array.from(arr, n => PASSWORD_CHARS[n % PASSWORD_CHARS.length]).join('')
 }
 
+const PAGE_SIZE = 20
+
+const SORT_OPTIONS: { key: AppUserSort; label: string }[] = [
+  { key: 'date_desc',      label: 'Eng yangi' },
+  { key: 'date_asc',       label: 'Eng eski' },
+  { key: 'favorites_desc', label: 'Eng faol' },
+]
+
 export default function AppUsers() {
-  const [users, setUsers]     = useState<AppUser[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState('')
-  const [search, setSearch]   = useState('')
+  const [items, setItems]         = useState<AppUser[]>([])
+  const [totalCount, setTotalCount] = useState(0)
+  const [loading, setLoading]     = useState(true)
+  const [error, setError]         = useState('')
+
+  // Qidiruv — inputga darhol yoziladi, so'rovga 350ms kechikish bilan boradi
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch]           = useState('')
+
+  const [sort, setSort]         = useState<AppUserSort>('date_desc')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo]     = useState('')
+  const [page, setPage]         = useState(1)
+  const [reloadKey, setReloadKey] = useState(0)
 
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -29,29 +50,44 @@ export default function AppUsers() {
   const [resetDone, setResetDone]     = useState(false)  // true bo'lsa — parol o'rnatilgan, bir martalik ko'rsatilmoqda
   const [copied, setCopied]           = useState(false)
 
-  async function load() {
+  // Qidiruv inputini debounce qilish
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput.trim()), 350)
+    return () => clearTimeout(t)
+  }, [searchInput])
+
+  // Filtr o'zgarsa — 1-sahifaga qaytamiz
+  useEffect(() => { setPage(1) }, [search, sort, dateFrom, dateTo])
+
+  // Har qanday filtr/sahifa o'zgarganda backenddan qayta yuklaymiz
+  useEffect(() => {
+    let cancelled = false
     setLoading(true)
     setError('')
-    try {
-      const list = await api.appUsers()
-      setUsers(list)
-    } catch (e: any) {
-      setError(e.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => { load() }, [])
+    api.appUsers({ q: search, sort, date_from: dateFrom, date_to: dateTo, page, page_size: PAGE_SIZE })
+      .then(res => {
+        if (cancelled) return
+        setItems(res.items)
+        setTotalCount(res.total_count)
+      })
+      .catch(e => { if (!cancelled) setError(e.message) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [search, sort, dateFrom, dateTo, page, reloadKey])
 
   async function confirmDelete() {
     if (deleteId == null) return
     setDeleting(true)
     try {
       await api.deleteAppUser(deleteId)
-      setUsers(prev => prev.filter(u => u.user_id !== deleteId))
       hapticSuccess()
       setDeleteId(null)
+      // Sahifadagi so'nggi yozuv o'chirilsa va bu birinchi sahifa bo'lmasa — oldingi sahifaga qaytamiz
+      if (items.length === 1 && page > 1) {
+        setPage(p => p - 1)
+      } else {
+        setReloadKey(k => k + 1)
+      }
     } catch (e: any) {
       hapticError()
       setError(e.message)
@@ -109,19 +145,10 @@ export default function AppUsers() {
     return new Date(ts * 1000).toLocaleDateString('uz-UZ', { day: '2-digit', month: '2-digit', year: 'numeric' })
   }
 
-  const filtered = users.filter(u => {
-    if (!search) return true
-    const q = search.toLowerCase()
-    return u.fullname.toLowerCase().includes(q) || u.phone.toLowerCase().includes(q)
-  })
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-48">
-        <Loader2 size={20} style={{ color: 'var(--accent)' }} className="animate-spin" />
-      </div>
-    )
-  }
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
+  const hasFilters = !!(search || dateFrom || dateTo)
+  const rangeStart = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
+  const rangeEnd   = Math.min(page * PAGE_SIZE, totalCount)
 
   return (
     <div className="px-4 pt-5 pb-6">
@@ -132,7 +159,7 @@ export default function AppUsers() {
             className="text-xs px-2.5 py-1 rounded-full font-semibold"
             style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent-hover)' }}
           >
-            {filtered.length} ta
+            {totalCount} ta
           </span>
         )}
       </div>
@@ -145,19 +172,77 @@ export default function AppUsers() {
       )}
 
       {/* Qidiruv */}
-      <div className="relative mb-5">
+      <div className="relative mb-3">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--fg-muted)' }} />
         <input
           type="text"
           placeholder="Ism yoki telefon bo'yicha qidirish..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
+          value={searchInput}
+          onChange={e => setSearchInput(e.target.value)}
           className="field w-full pl-9"
         />
       </div>
 
+      {/* Saralash */}
+      <div className="flex gap-2 mb-3 overflow-x-auto pb-1 scrollbar-hide">
+        {SORT_OPTIONS.map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => setSort(key)}
+            className="flex-shrink-0 text-xs font-semibold px-3.5 py-2 rounded-xl cursor-pointer transition-all duration-200"
+            style={{
+              background: sort === key ? 'rgba(99,102,241,0.15)' : 'var(--surface)',
+              color:      sort === key ? '#818cf8' : 'var(--fg-muted)',
+              border:     `1px solid ${sort === key ? 'rgba(99,102,241,0.3)' : 'var(--border)'}`,
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Sana oralig'i */}
+      <div className="flex items-center gap-2 mb-5">
+        <Calendar size={14} style={{ color: 'var(--fg-muted)', flexShrink: 0 }} />
+        <input
+          type="date"
+          value={dateFrom}
+          max={dateTo || undefined}
+          onChange={e => setDateFrom(e.target.value)}
+          className="field flex-1 text-sm"
+          aria-label="Sanadan"
+        />
+        <span className="text-xs" style={{ color: 'var(--fg-muted)' }}>—</span>
+        <input
+          type="date"
+          value={dateTo}
+          min={dateFrom || undefined}
+          onChange={e => setDateTo(e.target.value)}
+          className="field flex-1 text-sm"
+          aria-label="Sanagacha"
+        />
+        {(dateFrom || dateTo) && (
+          <button
+            onClick={() => { setDateFrom(''); setDateTo('') }}
+            className="w-8 h-8 rounded-xl flex items-center justify-center cursor-pointer transition-all active:scale-90 flex-shrink-0"
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--fg-muted)' }}
+            aria-label="Sana filtrini tozalash"
+            title="Sana filtrini tozalash"
+          >
+            <X size={13} />
+          </button>
+        )}
+      </div>
+
+      {/* Yuklanmoqda */}
+      {loading && (
+        <div className="flex items-center justify-center h-32">
+          <Loader2 size={20} style={{ color: 'var(--accent)' }} className="animate-spin" />
+        </div>
+      )}
+
       {/* Bo'sh holat */}
-      {filtered.length === 0 && (
+      {!loading && items.length === 0 && (
         <div className="glass p-6 text-center">
           <div
             className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3"
@@ -166,55 +251,98 @@ export default function AppUsers() {
             <Users size={20} style={{ color: 'var(--accent)' }} />
           </div>
           <p className="text-sm font-medium" style={{ color: 'var(--fg)' }}>
-            {search ? 'Hech narsa topilmadi' : "Hali mijozlar yo'q"}
+            {hasFilters ? 'Hech narsa topilmadi' : "Hali mijozlar yo'q"}
           </p>
         </div>
       )}
 
       {/* Mijozlar ro'yxati */}
-      <div className="flex flex-col gap-3">
-        {filtered.map(u => (
-          <div key={u.user_id} className="glass p-4 fade-up flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ background: 'rgba(99,102,241,0.12)' }}
-              >
-                <Users size={16} style={{ color: 'var(--accent)' }} />
+      {!loading && items.length > 0 && (
+        <div className="flex flex-col gap-3">
+          {items.map(u => (
+            <div key={u.user_id} className="glass p-4 fade-up flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div
+                  className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: 'rgba(99,102,241,0.12)' }}
+                >
+                  <Users size={16} style={{ color: 'var(--accent)' }} />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-semibold text-sm truncate" style={{ color: 'var(--fg)' }}>{u.fullname}</p>
+                    <span
+                      className="text-[11px] px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-1 flex-shrink-0"
+                      style={{ background: 'rgba(244,63,94,0.1)', color: '#fb7185' }}
+                      title="Sevimlilar soni"
+                    >
+                      <Heart size={10} fill="currentColor" /> {u.favorites_count}
+                    </span>
+                  </div>
+                  <p className="text-xs mt-0.5 flex items-center gap-1" style={{ color: 'var(--fg-muted)' }}>
+                    <Phone size={11} /> {u.phone}
+                  </p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--fg-muted)', opacity: 0.7 }}>
+                    Ro'yxatdan o'tgan: {fmtDate(u.created_at)}
+                  </p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="font-semibold text-sm truncate" style={{ color: 'var(--fg)' }}>{u.fullname}</p>
-                <p className="text-xs mt-0.5 flex items-center gap-1" style={{ color: 'var(--fg-muted)' }}>
-                  <Phone size={11} /> {u.phone}
-                </p>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--fg-muted)', opacity: 0.7 }}>
-                  Ro'yxatdan o'tgan: {fmtDate(u.created_at)}
-                </p>
+              <div className="flex gap-1.5 flex-shrink-0">
+                <button
+                  onClick={() => openReset(u)}
+                  className="w-8 h-8 rounded-xl flex items-center justify-center cursor-pointer transition-all active:scale-90"
+                  style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--fg-muted)' }}
+                  aria-label="Parolni tiklash"
+                  title="Parolni tiklash"
+                >
+                  <KeyRound size={13} />
+                </button>
+                <button
+                  onClick={() => setDeleteId(u.user_id)}
+                  className="w-8 h-8 rounded-xl flex items-center justify-center cursor-pointer transition-all active:scale-90"
+                  style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#f87171' }}
+                  aria-label="O'chirish"
+                  title="O'chirish"
+                >
+                  <Trash2 size={13} />
+                </button>
               </div>
             </div>
-            <div className="flex gap-1.5 flex-shrink-0">
-              <button
-                onClick={() => openReset(u)}
-                className="w-8 h-8 rounded-xl flex items-center justify-center cursor-pointer transition-all active:scale-90"
-                style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--fg-muted)' }}
-                aria-label="Parolni tiklash"
-                title="Parolni tiklash"
-              >
-                <KeyRound size={13} />
-              </button>
-              <button
-                onClick={() => setDeleteId(u.user_id)}
-                className="w-8 h-8 rounded-xl flex items-center justify-center cursor-pointer transition-all active:scale-90"
-                style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)', color: '#f87171' }}
-                aria-label="O'chirish"
-                title="O'chirish"
-              >
-                <Trash2 size={13} />
-              </button>
-            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Sahifalash */}
+      {!loading && totalCount > PAGE_SIZE && (
+        <div className="flex items-center justify-between mt-5">
+          <p className="text-xs" style={{ color: 'var(--fg-muted)' }}>
+            {rangeStart}–{rangeEnd} / {totalCount}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="w-8 h-8 rounded-xl flex items-center justify-center cursor-pointer transition-all active:scale-90 disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--fg)' }}
+              aria-label="Oldingi sahifa"
+            >
+              <ChevronLeft size={15} />
+            </button>
+            <span className="text-xs font-medium px-1" style={{ color: 'var(--fg-muted)' }}>
+              {page} / {totalPages}
+            </span>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="w-8 h-8 rounded-xl flex items-center justify-center cursor-pointer transition-all active:scale-90 disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--fg)' }}
+              aria-label="Keyingi sahifa"
+            >
+              <ChevronRight size={15} />
+            </button>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
 
       {/* O'chirishni tasdiqlash modali */}
       {deleteId != null && (

@@ -45,10 +45,20 @@ export interface Admin {
 }
 
 export interface AppUser {
-  user_id:    number
-  phone:      string
-  fullname:   string
-  created_at: number
+  user_id:         number
+  phone:           string
+  fullname:        string
+  created_at:      number
+  favorites_count: number
+}
+
+export type AppUserSort = 'date_desc' | 'date_asc' | 'favorites_desc'
+
+export interface AppUsersResponse {
+  items:       AppUser[]
+  total_count: number
+  page:        number
+  page_size:   number
 }
 
 export interface Order {

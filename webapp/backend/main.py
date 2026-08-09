@@ -15,7 +15,7 @@ import urllib.request
 import uuid
 from pathlib import Path
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 from time import time
 from typing import Annotated
 from zoneinfo import ZoneInfo
@@ -1726,18 +1726,89 @@ async def delete_admin(telegram_id: int, _: dict = Depends(require_super)):
 
 
 # ── /api/app-users (superadmin) — mijozlar (ilova orqali ro'yxatdan o'tganlar) ──
+_APP_USERS_SORT = {
+    "date_desc":      "au.created_at DESC",
+    "date_asc":       "au.created_at ASC",
+    "favorites_desc": "favorites_count DESC, au.created_at DESC",
+}
+
+
 @app.get("/api/app-users")
-async def list_app_users(_: dict = Depends(require_super)):
-    """Faqat superadmin ko'radi. password_hash/salt/session_token hech qachon qaytmaydi."""
+async def list_app_users(
+    q: str = "",
+    sort: str = "date_desc",
+    date_from: str = "",
+    date_to: str = "",
+    page: int = 1,
+    page_size: int = 20,
+    _: dict = Depends(require_super),
+):
+    """Faqat superadmin ko'radi. password_hash/salt/session_token hech qachon qaytmaydi.
+    Qidiruv, sana oralig'i, saralash va sahifalash SQL darajasida bajariladi — mijozlar
+    soni minglab bo'lsa ham frontend faqat kerakli sahifani so'raydi."""
+    page = max(1, page)
+    page_size = max(1, min(page_size, 100))
+
+    where_clauses: list[str] = []
+    params: list = []
+
+    if q.strip():
+        like = f"%{q.strip()}%"
+        where_clauses.append("(au.fullname LIKE ? OR au.phone LIKE ?)")
+        params.extend([like, like])
+
+    if date_from:
+        try:
+            ts_from = int(datetime.strptime(date_from, "%Y-%m-%d").replace(tzinfo=_UZB_TZ).timestamp())
+        except ValueError:
+            raise HTTPException(400, "date_from formati noto'g'ri (YYYY-MM-DD kutilmoqda)")
+        where_clauses.append("au.created_at >= ?")
+        params.append(ts_from)
+
+    if date_to:
+        try:
+            # kunning oxirigacha (inklyuziv) — keyingi kun boshlanishidan oldin
+            ts_to = int((datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1)).replace(tzinfo=_UZB_TZ).timestamp())
+        except ValueError:
+            raise HTTPException(400, "date_to formati noto'g'ri (YYYY-MM-DD kutilmoqda)")
+        where_clauses.append("au.created_at < ?")
+        params.append(ts_to)
+
+    where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+    order_sql = _APP_USERS_SORT.get(sort, _APP_USERS_SORT["date_desc"])
+
     async with aiosqlite.connect(USERS_DB_PATH) as db:
+        async with db.execute(f"SELECT COUNT(*) FROM app_users au {where_sql}", params) as cur:
+            (total_count,) = await cur.fetchone()
+
+        offset = (page - 1) * page_size
         async with db.execute(
-            "SELECT user_id, phone, fullname, created_at FROM app_users ORDER BY created_at DESC"
+            f"""
+            SELECT au.user_id, au.phone, au.fullname, au.created_at,
+                   COUNT(f.product_id) AS favorites_count
+            FROM app_users au
+            LEFT JOIN favorites f ON f.telegram_id = au.user_id
+            {where_sql}
+            GROUP BY au.user_id
+            ORDER BY {order_sql}
+            LIMIT ? OFFSET ?
+            """,
+            [*params, page_size, offset],
         ) as cur:
             rows = await cur.fetchall()
-    return [
-        {"user_id": r[0], "phone": r[1], "fullname": r[2], "created_at": r[3]}
-        for r in rows
-    ]
+
+    return {
+        "items": [
+            {
+                "user_id": r[0], "phone": r[1], "fullname": r[2],
+                "created_at": r[3], "favorites_count": r[4],
+            }
+            for r in rows
+        ],
+        "total_count": total_count,
+        "page": page,
+        "page_size": page_size,
+    }
 
 
 @app.delete("/api/app-users/{user_id}")

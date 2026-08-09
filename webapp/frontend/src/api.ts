@@ -220,7 +220,24 @@ export const api = {
       headers: headers(),
     }),
 
-  appUsers: () => request<import('./types').AppUser[]>('/app-users', { headers: headers() }),
+  appUsers: (params: {
+    q?: string
+    sort?: import('./types').AppUserSort
+    date_from?: string
+    date_to?: string
+    page?: number
+    page_size?: number
+  } = {}) => {
+    const qs = new URLSearchParams()
+    if (params.q)         qs.set('q', params.q)
+    if (params.sort)      qs.set('sort', params.sort)
+    if (params.date_from) qs.set('date_from', params.date_from)
+    if (params.date_to)   qs.set('date_to', params.date_to)
+    if (params.page)      qs.set('page', String(params.page))
+    if (params.page_size) qs.set('page_size', String(params.page_size))
+    const suffix = qs.toString() ? `?${qs.toString()}` : ''
+    return request<import('./types').AppUsersResponse>(`/app-users${suffix}`, { headers: headers() })
+  },
 
   deleteAppUser: (userId: number) =>
     request(`/app-users/${userId}`, { method: 'DELETE', headers: headers() }),
