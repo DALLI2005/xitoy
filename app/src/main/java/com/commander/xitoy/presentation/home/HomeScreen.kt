@@ -118,6 +118,7 @@ import com.commander.xitoy.presentation.common.ORDER_STAGES
 import com.commander.xitoy.presentation.common.OrderProgressBar
 import com.commander.xitoy.presentation.common.holatDisplay
 import com.commander.xitoy.presentation.common.holatToStage
+import com.commander.xitoy.presentation.common.productNeedsSelection
 import com.commander.xitoy.presentation.common.rememberStrongHaptic
 import com.commander.xitoy.presentation.orders.OrdersState
 import com.commander.xitoy.presentation.orders.OrdersViewModel
@@ -454,7 +455,7 @@ fun HomeScreen(
                             entranceIndex = if (playEntrance) index else null,
                             onClick = { onProductClick(product) },
                             onQuickAdd = {
-                                    if (product.allImages.size > 1 || product.variantlarYoqilgan) {
+                                if (productNeedsSelection(product)) {
                                     quickAddProduct = product
                                 } else {
                                     CartManager.addToCart(product, null, product.price, null)
@@ -491,7 +492,7 @@ fun HomeScreen(
                         product = product,
                         onClick = { onProductClick(product) },
                         onQuickAdd = {
-                            if (product.allImages.size > 1 || product.variantlarYoqilgan) {
+                            if (productNeedsSelection(product)) {
                                 quickAddProduct = product
                             } else {
                                 CartManager.addToCart(product, null, product.price, null)
@@ -550,9 +551,10 @@ fun HomeScreen(
         QuickAddBottomSheet(
             product = product,
             onDismiss = { quickAddProduct = null },
-            onAddToCart = { variantName, variantImg, price ->
-                CartManager.addToCart(product, variantName, price, variantImg)
+            onAddToCart = { variantName, sizeName, imageUrl, price ->
+                CartManager.addToCart(product, variantName, price, imageUrl, sizeName)
                 quickAddProduct = null
+                addedProductName = product.name
             }
         )
     }

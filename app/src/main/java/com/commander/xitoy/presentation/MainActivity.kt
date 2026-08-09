@@ -36,7 +36,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.core.content.ContextCompat
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -188,8 +187,12 @@ class MainActivity : ComponentActivity() {
                         ) {
                             val product = SelectedProductHolder.product
                             if (product != null) {
-                                val viewModel: HomeViewModel = hiltViewModel()
-                                val allProducts by viewModel.filteredProducts.collectAsState()
+                                // Activity-scoped homeViewModel ishlatiladi (hiltViewModel()
+                                // bilan bu yerda olingan yangi instance emas) — shunda
+                                // onCategoryClick orqali o'rnatilgan qidiruv Home tab bilan
+                                // bir xil holatni ko'rsatadi, va bir xil ma'lumot qayta
+                                // yuklanmaydi.
+                                val allProducts by homeViewModel.filteredProducts.collectAsState()
                                 DetailsScreen(
                                     product = product,
                                     allProducts = allProducts,
@@ -203,6 +206,13 @@ class MainActivity : ComponentActivity() {
                                     onProductClick = { sp ->
                                         SelectedProductHolder.product = sp
                                         rootNavController.navigate("details")
+                                    },
+                                    onCategoryClick = { category ->
+                                        homeViewModel.onSearchQueryChange(category)
+                                        rootNavController.navigate("main_screen?tab=home") {
+                                            popUpTo("main_screen") { inclusive = true }
+                                            launchSingleTop = true
+                                        }
                                     }
                                 )
                             }

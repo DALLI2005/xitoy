@@ -61,14 +61,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import android.widget.Toast
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -84,6 +87,8 @@ import coil.compose.AsyncImage
 import com.commander.xitoy.domain.model.CartManager
 import com.commander.xitoy.domain.model.FavoritesManager
 import com.commander.xitoy.domain.model.Product
+import com.commander.xitoy.presentation.common.colorSwatchFor
+import com.commander.xitoy.presentation.common.computeSelectionRules
 import com.commander.xitoy.presentation.common.rememberHaptic
 import com.commander.xitoy.presentation.common.rememberStrongHaptic
 import com.commander.xitoy.presentation.home.ProductCard
@@ -133,19 +138,42 @@ fun DetailsScreen(
     allProducts: List<Product> = emptyList(),
     onBackClick: () -> Unit,
     onCartClick: () -> Unit = {},
-    onProductClick: (Product) -> Unit = {}
+    onProductClick: (Product) -> Unit = {},
+    onCategoryClick: (String) -> Unit = {}
 ) {
     val images = product.allImages
     var activeImg by remember(product.id) { mutableIntStateOf(0) }
     var fullscreenOpen by remember(product.id) { mutableStateOf(false) }
+    // Rang kartochkasiga ikki marta tez bosilganda (double-tap) ochiladigan
+    // alohida fullscreen — asosiy activeImg/fullscreenOpen bilan bog'lanmagan
+    // mustaqil holat.
+    var rangFullscreenImage by remember(product.id) { mutableStateOf<String?>(null) }
 
     // Size support
     val availableSizes = product.razmerMatritsa[activeImg.toString()] ?: emptyList()
     var selectedSize by remember(product.id, activeImg) { mutableStateOf<com.commander.xitoy.domain.model.SizeOption?>(null) }
 
-    // Rang xususiyati
-    val rangAttrKey = product.attributes.keys.firstOrNull { it.equals("Rang", ignoreCase = true) }
-    val rangValues = rangAttrKey?.let { product.attributes[it] } ?: emptyList()
+    // Boshqa xususiyatlar (rang va o'lchamdan tashqari) — savatga qo'shishdan
+    // oldin tanlanishi shart, shuning uchun holat shu yerda (DetailsScreen
+    // darajasida) saqlanadi va AttributesSection'ga tashqaridan uzatiladi.
+    val selectedOtherAttributes = remember(product.id) { mutableStateMapOf<String, String>() }
+    // Sahifa ochilganda hech narsa oldindan tanlangan bo'lmasligi kerak.
+    var selectedRangValue by remember(product.id) { mutableStateOf<String?>(null) }
+
+    // Rang/o'lcham/boshqa xususiyatlar qoidasi — QuickAddBottomSheet bilan bir
+    // xil umumiy funksiyadan hisoblanadi, ikkalasi orasida qoidalar
+    // farqlanib qolmasligi (va shu sabab yana "tanlovsiz savatga tushish"
+    // muammosi qaytmasligi) uchun.
+    val selectionRules = computeSelectionRules(
+        product = product,
+        availableSizes = availableSizes,
+        selectedRangValue = selectedRangValue,
+        selectedSize = selectedSize,
+        selectedOtherAttributes = selectedOtherAttributes
+    )
+    val rangValues = selectionRules.rangValues
+    val otherAttributes = selectionRules.otherAttributes
+    val missingSelections = selectionRules.missingSelections
 
     // Narx/variant sinxronizatsiyasi — "Variantlar (Rang va Narx)" bo'limi, alohida
     // tizim, rang nomi bilan variant nomi matn darajasida moslashtiriladi.
@@ -155,7 +183,6 @@ fun DetailsScreen(
             if (idx >= 0) value to idx else null
         }.toMap()
     } else emptyMap()
-    var selectedRangValue by remember(product.id) { mutableStateOf(rangValues.firstOrNull()) }
 
     // Variant support
     val activeBasePrice = when {
@@ -172,10 +199,9 @@ fun DetailsScreen(
     val isFavorite = favorites.any { it.id == product.id }
     val cartCount = CartManager.cartItems.collectAsState().value.size
 
-    val canAddToCart = availableSizes.isEmpty() || selectedSize != null
+    val canAddToCart = missingSelections.isEmpty()
     val finalPrice = (activeBasePrice * (100 - product.discountPercent) / 100).toLong()
     val isHot = product.soldCount >= 100
-    val totalPrice = finalPrice * quantity
 
     var pressed by remember { mutableStateOf(false) }
     val btnScale by animateFloatAsState(
@@ -222,6 +248,7 @@ fun DetailsScreen(
 
     val haptic = rememberStrongHaptic()
     val favHaptic = rememberHaptic()
+    val context = LocalContext.current
 
     Box(modifier = Modifier.fillMaxSize().background(DalliBackground)) {
 
@@ -379,22 +406,29 @@ fun DetailsScreen(
                     onSelect = { value ->
                         selectedRangValue = value
                         rangValueToImageIndex[value]?.let { activeImg = it }
-                    }
+                    },
+                    onDoubleTapImage = { url -> rangFullscreenImage = url }
                 )
             }
 
             // ─── Boshqa xususiyatlar — Rang tanlashdan DARHOL KEYIN, narx
             // blokidan oldin, ketma-ket to'plangan holda. Rang va o'lcham
             // yuqorida alohida (haqiqiy rasm/narx bilan) ko'rsatilgani uchun
-            // bu yerda takrorlanmaydi.
-            val otherAttributes = product.attributes.filterKeys { key ->
-                val isRang = key.equals("Rang", ignoreCase = true)
-                val isSizeLike = key.normalizeUz().contains("olcham") && availableSizes.isNotEmpty()
-                !isRang && !isSizeLike
-            }
+            // bu yerda takrorlanmaydi. Holat DetailsScreen darajasida (yuqorida)
+            // — savatga qo'shishdan oldin tanlanganligini tekshirish uchun.
             if (otherAttributes.isNotEmpty()) {
                 Box(modifier = Modifier.padding(horizontal = 16.dp).padding(top = 14.dp)) {
-                    AttributesSection(attributes = otherAttributes)
+                    AttributesSection(
+                        attributes = otherAttributes,
+                        selected = selectedOtherAttributes,
+                        onToggle = { attrName, value ->
+                            if (selectedOtherAttributes[attrName] == value) {
+                                selectedOtherAttributes.remove(attrName)
+                            } else {
+                                selectedOtherAttributes[attrName] = value
+                            }
+                        }
+                    )
                 }
             }
 
@@ -477,13 +511,40 @@ fun DetailsScreen(
                 // Kategoriya + nom + reyting
                 Column {
                     if (product.category.isNotBlank()) {
-                        Text(
-                            // To'liq yo'l: "Elektronika › Aqlli uy va xavfsizlik › Aqlli uy"
-                            text = product.fullCategoryPath,
-                            fontSize = 12.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = DalliPrimary
-                        )
+                        // Har bir daraja (category/subcategory/productType) alohida
+                        // bosiladigan segment — bosilganda o'sha kategoriyaga tegishli
+                        // katalogga o'tadi (onCategoryClick).
+                        val categorySegments = listOf(product.category, product.subcategory, product.productType)
+                            .filter { it.isNotBlank() }
+                        // Bukilmaydi (wrap) — uzun bo'lsa so'z o'rtasidan sinib
+                        // ketmasligi uchun bitta qatorda gorizontal skroll bilan.
+                        Row(
+                            modifier = Modifier.horizontalScroll(rememberScrollState()),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                        ) {
+                            categorySegments.forEachIndexed { idx, segment ->
+                                Text(
+                                    text = segment,
+                                    fontSize = 14.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = DalliPrimary,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    modifier = Modifier.clickable { onCategoryClick(segment) }
+                                )
+                                if (idx != categorySegments.lastIndex) {
+                                    Text(
+                                        text = "›",
+                                        fontSize = 14.5.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = DalliPrimary,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                }
+                            }
+                        }
                         Spacer(Modifier.height(5.dp))
                     }
                     Text(
@@ -651,7 +712,7 @@ fun DetailsScreen(
             ) {
             if (!canAddToCart) {
                 Text(
-                    text = "Iltimos, o'lchamni tanlang",
+                    text = "Iltimos, ${missingSelections.joinToString(", ")} tanlang",
                     fontSize = 12.sp,
                     color = DalliMuted,
                     fontWeight = FontWeight.Medium,
@@ -730,6 +791,14 @@ fun DetailsScreen(
                                 }
                                 added = true
                                 pressed = true
+                            } else if (!canAddToCart) {
+                                // Hali tanlanmagan xususiyatlar bo'yicha aniq xabar —
+                                // foydalanuvchi nima yetishmayotganini bilishi kerak.
+                                Toast.makeText(
+                                    context,
+                                    "${missingSelections.joinToString(", ")} tanlang",
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             }
                         },
                     horizontalArrangement = Arrangement.Center,
@@ -759,7 +828,7 @@ fun DetailsScreen(
                                 Icon(Lucide.ShoppingCart, null, tint = Color.White, modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(8.dp))
                                 Text(
-                                    "Savatga · ${groupSom(totalPrice)} so'm",
+                                    "Savatga qo'shish",
                                     color = Color.White,
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.ExtraBold,
@@ -782,6 +851,22 @@ fun DetailsScreen(
                 productName = product.name,
                 onIndexChange = { activeImg = it },
                 onClose = { fullscreenOpen = false }
+            )
+        }
+
+        // ─── Rang rasmi uchun full-screen (double-tap orqali) — boshqa
+        // ranglarga ham rasm biriktirilgan bo'lsa, ular orasida ham swipe qilish
+        // mumkin (bonus).
+        val rangImgToShow = rangFullscreenImage
+        if (rangImgToShow != null) {
+            val rangImagesList = product.rangRasmlari.values.toList()
+            val startIdx = rangImagesList.indexOf(rangImgToShow).coerceAtLeast(0)
+            FullScreenImageViewer(
+                images = rangImagesList,
+                initialIndex = startIdx,
+                productName = product.name,
+                onIndexChange = {},
+                onClose = { rangFullscreenImage = null }
             )
         }
     }
@@ -845,14 +930,23 @@ private fun SectionTitle(text: String, modifier: Modifier = Modifier) {
 /**
  * Xususiyatlar bo'limi. "Rang" uchun rang doirasi ko'rsatiladi, qolganlari
  * oddiy chip. Ma'no faqat rang orqali berilmaydi — nomi ham doim yoziladi.
+ * Har bir xususiyat turi (masalan "Poyabzal o'lchami") o'z ichida mustaqil
+ * tanlangan qiymatga ega — bittasini tanlash boshqasiga ta'sir qilmaydi.
+ * Tanlangan qiymatlar holati DetailsScreen darajasida saqlanadi (`selected`)
+ * — savatga qo'shishdan oldin barchasi tanlanganligini tekshirish uchun.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun AttributesSection(attributes: Map<String, List<String>>) {
+private fun AttributesSection(
+    attributes: Map<String, List<String>>,
+    selected: Map<String, String>,
+    onToggle: (attrName: String, value: String) -> Unit
+) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         SectionTitle("Xususiyatlar")
         attributes.forEach { (nom, qiymatlar) ->
             if (qiymatlar.isNotEmpty()) {
+                val selectedValue = selected[nom]
                 Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
                     Text(
                         text = nom,
@@ -865,7 +959,12 @@ private fun AttributesSection(attributes: Map<String, List<String>>) {
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         qiymatlar.forEach { qiymat ->
-                            AttributeChip(name = nom, value = qiymat)
+                            AttributeChip(
+                                name = nom,
+                                value = qiymat,
+                                isSelected = selectedValue == qiymat,
+                                onClick = { onToggle(nom, qiymat) }
+                            )
                         }
                     }
                 }
@@ -875,13 +974,23 @@ private fun AttributesSection(attributes: Map<String, List<String>>) {
 }
 
 @Composable
-private fun AttributeChip(name: String, value: String) {
+private fun AttributeChip(name: String, value: String, isSelected: Boolean, onClick: () -> Unit) {
     val swatch = if (name.equals("Rang", ignoreCase = true)) colorSwatchFor(value) else null
+    val borderColor by animateColorAsState(
+        targetValue = if (isSelected) DalliText else DalliLine,
+        animationSpec = tween(180),
+        label = "attr_chip_border"
+    )
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(10.dp))
             .background(DalliSurface)
-            .border(1.dp, DalliLine, RoundedCornerShape(10.dp))
+            .border(
+                width = if (isSelected) 2.dp else 1.dp,
+                color = borderColor,
+                shape = RoundedCornerShape(10.dp)
+            )
+            .clickable { onClick() }
             .padding(horizontal = 12.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -898,14 +1007,11 @@ private fun AttributeChip(name: String, value: String) {
         Text(
             text = value,
             fontSize = 13.5.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = DalliTextSecondary
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+            color = if (isSelected) DalliText else DalliTextSecondary
         )
     }
 }
-
-private fun String.normalizeUz(): String =
-    this.lowercase().replace("'", "").replace("’", "").replace("ʻ", "")
 
 /**
  * Rang tanlash — "Rang: {tanlangan}" sarlavhasi va pastda kvadrat swatchlar.
@@ -918,7 +1024,8 @@ private fun RangSelector(
     rangValues: List<String>,
     selectedValue: String?,
     rangImages: Map<String, String>,
-    onSelect: (String) -> Unit
+    onSelect: (String) -> Unit,
+    onDoubleTapImage: (String) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -946,16 +1053,26 @@ private fun RangSelector(
                 )
                 Box(
                     modifier = Modifier
-                        .size(72.dp)
+                        .size(52.dp)
                         .scale(chipScale)
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(11.dp))
                         .background(swatchColor ?: DalliSurfaceAlt)
                         .border(
                             width = if (isSelected) 2.dp else 1.dp,
                             color = if (isSelected) DalliText else DalliLine,
-                            shape = RoundedCornerShape(16.dp)
+                            shape = RoundedCornerShape(11.dp)
                         )
-                        .clickable { onSelect(value) },
+                        // Bitta bosish — rangni tanlaydi. Ikkita tez ketma-ket
+                        // bosish (double-tap) — shu rangga biriktirilgan rasmni
+                        // full-screen'da ochadi (faqat rasm biriktirilgan bo'lsa).
+                        .pointerInput(value, imgUrl) {
+                            detectTapGestures(
+                                onTap = { onSelect(value) },
+                                onDoubleTap = {
+                                    if (imgUrl != null) onDoubleTapImage(imgUrl)
+                                }
+                            )
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     if (imgUrl != null) {
@@ -966,7 +1083,7 @@ private fun RangSelector(
                             modifier = Modifier
                                 .matchParentSize()
                                 .padding(if (isSelected) 3.dp else 0.dp)
-                                .clip(RoundedCornerShape(13.dp))
+                                .clip(RoundedCornerShape(9.dp))
                         )
                     } else if (swatchColor == null) {
                         // Nomi rang lug'atida yo'q — rasm ham, doira ham chizib bo'lmaydi,
@@ -986,32 +1103,6 @@ private fun RangSelector(
             }
         }
     }
-}
-
-/** Saytdagi rang nomlarini ko'rsatish uchun rangga o'giradi. */
-private fun colorSwatchFor(name: String): Color? = when (name.trim().lowercase()) {
-    "alvon" -> Color(0xFFE03C31)
-    "ametist" -> Color(0xFF9966CC)
-    "to'q qizil" -> Color(0xFF8B0000)
-    "sarg'ish" -> Color(0xFFF5DEB3)
-    "sarg'ish melanj" -> Color(0xFFD2B48C)
-    "oq" -> Color(0xFFFFFFFF)
-    "moviy" -> Color(0xFF4169E1)
-    "xantal" -> Color(0xFFFFDB58)
-    "sariq" -> Color(0xFFFFFF00)
-    "yashil" -> Color(0xFF008000)
-    "yashil xaki" -> Color(0xFF556B2F)
-    "tilla xaki" -> Color(0xFFBDB76B)
-    "tilla" -> Color(0xFFFFD700)
-    "indigo" -> Color(0xFF4B0082)
-    "qora" -> Color(0xFF000000)
-    "kulrang" -> Color(0xFF808080)
-    "qizil" -> Color(0xFFFF0000)
-    "pushti" -> Color(0xFFFFC0CB)
-    "jigarrang" -> Color(0xFFA52A2A)
-    "binafsha" -> Color(0xFF800080)
-    "havorang" -> Color(0xFF87CEEB)
-    else -> null
 }
 
 /** Tavsifnoma jadvali — nom / qiymat qatorlari, orasida ajratgich. */

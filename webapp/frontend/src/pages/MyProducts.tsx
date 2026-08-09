@@ -253,6 +253,24 @@ export default function MyProducts({ user }: Props) {
     }
   }
 
+  // O'chirish modali ochiq bo'lganda Enter = O'chirish, Escape = Bekor qilish.
+  // Jarayon ketayotganda (deleting) ikkalasi ham ishlamaydi.
+  useEffect(() => {
+    if (deleteId == null) return
+    function handleKeyDown(e: KeyboardEvent) {
+      if (deleting) return
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        confirmDelete()
+      } else if (e.key === 'Escape') {
+        e.preventDefault()
+        setDeleteId(null)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [deleteId, deleting])
+
   async function toggleField(id: number | string, field: 'active' | 'in_stock', current: boolean) {
     const key = `${id}:${field}`
     setToggling(key)

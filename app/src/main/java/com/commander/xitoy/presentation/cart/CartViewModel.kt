@@ -86,7 +86,10 @@ class CartViewModel @Inject constructor(
                 _orderState.value = OrderState.Success(response.order_id)
                 cancelCartReminderSilent(telegramId)
             } catch (e: Exception) {
-                _orderState.value = OrderState.Error(e.message ?: "Xatolik yuz berdi")
+                // Xom exception matni (masalan "timeout", "SocketTimeoutException")
+                // hech qachon foydalanuvchiga ko'rsatilmaydi — xatolik turidan
+                // qat'iy nazar doim tushunarli o'zbekcha xabar beriladi.
+                _orderState.value = OrderState.Error("Xatolik yuz berdi. Qayta urinib ko'ring.")
             }
         }
     }
