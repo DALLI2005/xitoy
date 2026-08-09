@@ -441,6 +441,7 @@ async def _init_products_db():
         for _col, _default in (
             ("country", "''"),           # Ishlab chiqarilgan mamlakat
             ("attributes", "'{}'"),      # Xususiyatlar: {"Rang": ["Qora"], ...}
+            ("rang_rasmlari", "'{}'"),   # Har bir rang uchun rasm URL: {"Qora": "https://...", ...}
         ):
             try:
                 await db.execute(f"ALTER TABLE products ADD COLUMN {_col} TEXT DEFAULT {_default}")
@@ -1034,6 +1035,7 @@ class ProductIn(BaseModel):
     country:          str       = ""      # Ishlab chiqarilgan mamlakat
     guarantee_months: int       = 0       # Kafolat (oylarda); 0 = qonun bo'yicha 6 oy
     attributes:       dict[str, list[str]] = {}   # {"Rang": ["Qora","Oq"], ...}
+    rang_rasmlari:    dict[str, str] = {}  # {"Qora": "https://...jpg", ...} — har bir rangga alohida rasm
     image_url:        str
     images:           list[str] = []
     rating:           float     = 4.5
@@ -1117,6 +1119,7 @@ class ProductUpdate(BaseModel):
     country:             str | None       = None
     guarantee_months:    int | None       = None
     attributes:          dict[str, list[str]] | None = None
+    rang_rasmlari:       dict[str, str] | None = None
     image_url:           str | None       = None
     images:              list[str] | None = None
     variantlar_yoqilgan: bool | None      = None
@@ -1426,6 +1429,10 @@ async def list_products(
         var_nom = json.loads(d.get("variant_nomlari") or "[]")
         var_narx = json.loads(d.get("variant_narxlari") or "[]")
         razmer = json.loads(d.get("razmer_matritsa") or "{}")
+        rang_rasmlari = {
+            rang: fix_image_url(url)
+            for rang, url in (json.loads(d.get("rang_rasmlari") or "{}")).items()
+        }
 
         # Kategoriya har doim to'liq 3 darajali yo'l bo'lib qaytadi — sayt ham,
         # ilova ham bir xil ma'lumotni ko'radi.
@@ -1451,6 +1458,7 @@ async def list_products(
             "guarantee_months":   int(d.get("guarantee_months", 0) or 0),
             "guaranteeMonths":    int(d.get("guarantee_months", 0) or 0),
             "attributes":         json.loads(d.get("attributes") or "{}"),
+            "rangRasmlari":       rang_rasmlari,
             "image":              img_url,
             "image_url":          img_url,
             "imageUrl":           img_url,
@@ -1587,8 +1595,8 @@ async def add_product(product: ProductIn, user: dict = Depends(get_current_user)
                 name, price, discount, category, subcategory, product_type, description, image_url, images,
                 rating, sold_count, discount_type, discount_expires, auto_delete,
                 active, in_stock, variantlar_yoqilgan, variant_nomlari, variant_narxlari, razmer_matritsa,
-                country, guarantee_months, attributes, added_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?, ?, ?, ?, ?, ?)
+                country, guarantee_months, attributes, rang_rasmlari, added_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 product.name, product.price, product.discount,
@@ -1597,6 +1605,7 @@ async def add_product(product: ProductIn, user: dict = Depends(get_current_user)
                 product.discount_expires, 1 if product.auto_delete else 0,
                 1 if product.variantlar_yoqilgan else 0, var_nom_json, var_narx_json, razmer_json,
                 product.country, max(0, product.guarantee_months), json.dumps(product.attributes or {}),
+                json.dumps(product.rang_rasmlari or {}),
                 str(user.get("telegram_id", ""))
             )
         )

@@ -75,6 +75,10 @@ data class Product(
     /** Xususiyatlar: {"Rang": ["Qora","Oq"], "O'lcham": ["M","L"]} */
     @SerializedName("attributes")
     val attributes: Map<String, List<String>> = emptyMap(),
+
+    /** Har bir rang uchun alohida biriktirilgan rasm: {"Qora": "https://...jpg", ...} */
+    @SerializedName("rangRasmlari")
+    val rangRasmlari: Map<String, String> = emptyMap(),
 ) {
     // Barcha rasmlar: images mavjud bo'lsa ularni, yo'qsa imageUrl ni qaytaradi
     val allImages: List<String>

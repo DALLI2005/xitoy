@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import {
   ChevronDown, CheckCircle2, AlertCircle, Loader2,
   ArrowRight, ArrowLeft, ImagePlus, X, Languages,
-  Tag, Percent, Clock, Ruler, Plus, Trash2, Search, Check
+  Tag, Percent, Clock, Ruler, Plus, Trash2, Search, Check, Camera
 } from 'lucide-react'
 import { api } from '../api'
 import { hapticSuccess, hapticError } from '../telegram'
@@ -83,7 +83,44 @@ export default function AddProduct({ user }: Props) {
   const [activeAttrType, setActiveAttrType] = useState<string>('')
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string[]>>({})
   const [activeAttributes, setActiveAttributes] = useState<string[]>([])
-  
+
+  // Har bir rang uchun alohida biriktirilgan rasm — "Variantlar (Rang va Narx)"
+  // bo'limidan mustaqil, faqat "Rang" xususiyati chiplariga tegishli.
+  const [rangRasmlari, setRangRasmlari] = useState<Record<string, string>>({})
+  const [uploadingColor, setUploadingColor] = useState<string | null>(null)
+  const colorImageInputRef = useRef<HTMLInputElement>(null)
+  const pendingColorRef = useRef<string | null>(null)
+
+  function openColorImagePicker(color: string) {
+    pendingColorRef.current = color
+    colorImageInputRef.current?.click()
+  }
+
+  async function handleColorImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    const color = pendingColorRef.current
+    e.target.value = ''
+    pendingColorRef.current = null
+    if (!file || !color) return
+    setUploadingColor(color)
+    try {
+      const url = await api.uploadImage(file)
+      setRangRasmlari(prev => ({ ...prev, [color]: url }))
+    } catch {
+      showToast('error', 'Rang uchun rasm yuklanmadi')
+    } finally {
+      setUploadingColor(null)
+    }
+  }
+
+  function removeColorImage(color: string) {
+    setRangRasmlari(prev => {
+      const copy = { ...prev }
+      delete copy[color]
+      return copy
+    })
+  }
+
   const AVAILABLE_COLORS = [
     { name: 'Alvon', hex: '#E03C31' },
     { name: 'Ametist', hex: '#9966CC' },
@@ -194,15 +231,15 @@ export default function AddProduct({ user }: Props) {
   // (atributlar oldingi kategoriyaga xos bo'lgani uchun yangisiga o'tmasligi kerak)
   function handleCat1Change(val: string) {
     setCat1(val); setCat2(''); setCat3(''); setCatConfirmed(false)
-    setSelectedAttributes({}); setActiveAttributes([])
+    setSelectedAttributes({}); setActiveAttributes([]); setRangRasmlari({})
   }
   function handleCat2Change(val: string) {
     setCat2(val); setCat3(''); setCatConfirmed(false)
-    setSelectedAttributes({}); setActiveAttributes([])
+    setSelectedAttributes({}); setActiveAttributes([]); setRangRasmlari({})
   }
   function handleCat3Change(val: string) {
     setCat3(val); setCatConfirmed(false)
-    setSelectedAttributes({}); setActiveAttributes([])
+    setSelectedAttributes({}); setActiveAttributes([]); setRangRasmlari({})
   }
   function confirmCategory() {
     if (!cat1 || !cat2 || !cat3) return
@@ -327,6 +364,12 @@ export default function AddProduct({ user }: Props) {
         if (vals.length > 0) attributesFinal[attr] = vals
       })
 
+      // Rang rasmlari — faqat hozir tanlangan ranglar uchun bo'lgan yozuvlar yuboriladi
+      const selectedColors = new Set(selectedAttributes['Rang'] || [])
+      const rangRasmlariFinal = Object.fromEntries(
+        Object.entries(rangRasmlari).filter(([color]) => selectedColors.has(color))
+      )
+
       await api.addProduct({
         name: form.name.trim(),
         price: priceNum,
@@ -345,6 +388,7 @@ export default function AddProduct({ user }: Props) {
         country: countryFinal,
         guarantee_months: parseInt(guarantee) || 0,
         attributes: attributesFinal,
+        rang_rasmlari: rangRasmlariFinal,
         image_url: imageUrls[0] || '',
         images: imageUrls,
         rating: parseFloat(form.rating) || 4.2,
@@ -367,7 +411,7 @@ export default function AddProduct({ user }: Props) {
       setSizesByColor({}); setDiscountType('permanent')
       setSelectedDuration(null); setCustomMinutes('')
       setCountry(''); setNoCountry(false); setIsChina(true); setGuarantee('')
-      setActiveAttributes([]); setSelectedAttributes({})
+      setActiveAttributes([]); setSelectedAttributes({}); setRangRasmlari({})
     } catch (err: any) {
       hapticError?.()
       showToast('error', err?.message || "Xato yuz berdi")
@@ -820,7 +864,7 @@ export default function AddProduct({ user }: Props) {
                   Qo'shish: {attr.toLowerCase()}
                 </button>
                 <div style={{ marginTop: '8px' }}>
-                  <button 
+                  <button
                     type="button"
                     onClick={() => {
                       setActiveAttributes(prev => prev.filter(a => a !== attr))
@@ -829,22 +873,53 @@ export default function AddProduct({ user }: Props) {
                         delete copy[attr]
                         return copy
                       })
+                      if (attr === 'Rang') setRangRasmlari({})
                     }}
                     style={{ color: '#EF4444', background: '#FEE2E2', border: 'none', borderRadius: '4px', padding: '4px 8px', fontSize: '12px', cursor: 'pointer' }}
                   >
                     O'chirish
                   </button>
                 </div>
-                
+
                 {(selectedAttributes[attr] || []).length > 0 && (
                   <div style={{ marginTop: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     {(selectedAttributes[attr] || []).map(val => {
                       const isColor = attr === 'Rang'
                       const colorInfo = isColor ? AVAILABLE_COLORS.find(a => a.name === val) : null
+                      const colorImg = isColor ? rangRasmlari[val] : undefined
                       return (
                         <div key={val} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '8px' }}>
-                          {isColor && <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: colorInfo?.hex, border: colorInfo?.hex === '#FFFFFF' ? '1px solid #E2E8F0' : 'none' }}></div>}
+                          {isColor ? (
+                            <button
+                              type="button"
+                              onClick={() => openColorImagePicker(val)}
+                              title="Rang uchun rasm biriktirish"
+                              style={{
+                                position: 'relative', width: '20px', height: '20px', borderRadius: '50%', padding: 0, flexShrink: 0, cursor: 'pointer',
+                                background: colorImg ? `url(${colorImg}) center/cover no-repeat` : colorInfo?.hex,
+                                border: (!colorImg && colorInfo?.hex === '#FFFFFF') ? '1px solid #E2E8F0' : 'none',
+                              }}
+                            >
+                              {uploadingColor === val ? (
+                                <Loader2 size={10} className="spin" style={{ position: 'absolute', inset: 0, margin: 'auto', color: '#fff' }} />
+                              ) : !colorImg && (
+                                <span style={{ position: 'absolute', bottom: -3, right: -3, width: 12, height: 12, borderRadius: '50%', background: '#8B5CF6', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 1.5px #fff' }}>
+                                  <Camera size={7} color="#fff" />
+                                </span>
+                              )}
+                            </button>
+                          ) : null}
                           <span style={{ fontSize: '14px' }}>{val}</span>
+                          {isColor && colorImg && (
+                            <button
+                              type="button"
+                              onClick={() => removeColorImage(val)}
+                              title="Rasmni olib tashlash"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', padding: 0, display: 'flex' }}
+                            >
+                              <X size={12} />
+                            </button>
+                          )}
                         </div>
                       )
                     })}
@@ -852,7 +927,14 @@ export default function AddProduct({ user }: Props) {
                 )}
               </div>
             ))}
-            
+            <input
+              ref={colorImageInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleColorImageSelect}
+              style={{ display: 'none' }}
+            />
+
             {showAttrModal && activeAttrType && (
               <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
                 <div style={{ background: '#FFFFFF', width: '100%', maxWidth: '500px', borderRadius: '12px', display: 'flex', flexDirection: 'column', maxHeight: '100%', overflow: 'hidden', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)' }}>
@@ -902,6 +984,7 @@ export default function AddProduct({ user }: Props) {
                                     const updated = checked ? [...current, opt] : current.filter(x => x !== opt)
                                     return { ...prev, [activeAttrType]: updated }
                                   })
+                                  if (!checked && isColor) removeColorImage(opt)
                                 }}
                               />
                               <div style={{ 

@@ -1,5 +1,6 @@
 package com.commander.xitoy.presentation.details
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
@@ -12,6 +13,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.scale
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -48,6 +54,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,7 +63,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -97,6 +106,7 @@ import com.composables.icons.lucide.ShoppingCart
 import com.composables.icons.lucide.ShieldCheck
 import com.composables.icons.lucide.Star
 import com.composables.icons.lucide.Truck
+import com.composables.icons.lucide.X
 import kotlinx.coroutines.delay
 
 private val StarGold = Color(0xFFF5A623)
@@ -120,15 +130,18 @@ fun DetailsScreen(
 ) {
     val images = product.allImages
     var activeImg by remember(product.id) { mutableIntStateOf(0) }
+    var fullscreenOpen by remember(product.id) { mutableStateOf(false) }
 
     // Size support
     val availableSizes = product.razmerMatritsa[activeImg.toString()] ?: emptyList()
     var selectedSize by remember(product.id, activeImg) { mutableStateOf<com.commander.xitoy.domain.model.SizeOption?>(null) }
 
-    // Rang xususiyati — admin "Variantlar" bosqichida har bir rangga rasm biriktirgan
-    // bo'lsa, o'sha haqiqiy rasm ko'rsatiladi; aks holda oddiy rang doirasi chiziladi.
+    // Rang xususiyati
     val rangAttrKey = product.attributes.keys.firstOrNull { it.equals("Rang", ignoreCase = true) }
     val rangValues = rangAttrKey?.let { product.attributes[it] } ?: emptyList()
+
+    // Narx/variant sinxronizatsiyasi — "Variantlar (Rang va Narx)" bo'limi, alohida
+    // tizim, rang nomi bilan variant nomi matn darajasida moslashtiriladi.
     val rangValueToImageIndex: Map<String, Int> = if (product.variantlarYoqilgan) {
         rangValues.mapNotNull { value ->
             val idx = product.variantNomlari.indexOfFirst { it.equals(value, ignoreCase = true) }
@@ -211,7 +224,7 @@ fun DetailsScreen(
                 .verticalScroll(rememberScrollState())
         ) {
 
-            // ─── Hero ─────────────────────────────────────────────────────────
+            // ─── Hero — bosilganda fullscreen rasm ko'rish ochiladi ──────────
             Box(
                 modifier = Modifier
                     .statusBarsPadding()
@@ -224,6 +237,7 @@ fun DetailsScreen(
                         .matchParentSize()
                         .clip(RoundedCornerShape(20.dp))
                         .background(DalliSurfaceAlt)
+                        .clickable(enabled = images.isNotEmpty()) { fullscreenOpen = true }
                 ) {
                     Crossfade(
                         targetState = activeImg,
@@ -288,21 +302,7 @@ fun DetailsScreen(
                 }
             }
 
-            // ─── Rang tanlash — haqiqiy rasm yoki rang doirasi ─────────────────
-            if (rangValues.isNotEmpty()) {
-                RangSelector(
-                    rangValues = rangValues,
-                    selectedValue = selectedRangValue,
-                    valueToImageIndex = rangValueToImageIndex,
-                    images = images,
-                    onSelect = { value ->
-                        selectedRangValue = value
-                        rangValueToImageIndex[value]?.let { activeImg = it }
-                    }
-                )
-            }
-
-            // ─── Thumbnaillar ─────────────────────────────────────────────────
+            // ─── Thumbnaillar — BIRINCHI qator (rasmlar tepada) ────────────────
             // Rang tanlovchi haqiqiy rasmlarga bog'langan bo'lsagina (valueToImageIndex
             // to'la) u orqali barcha rasmlarni ko'rish mumkin; aks holda (rang faqat
             // ma'lumot yoki rasmga bog'lanmagan) thumbnaillar hamon kerak.
@@ -315,19 +315,25 @@ fun DetailsScreen(
                 ) {
                     images.take(4).forEachIndexed { i, img ->
                         val selected = activeImg == i
+                        val thumbScale by animateFloatAsState(
+                            targetValue = if (selected) 1.1f else 1f,
+                            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+                            label = "thumb_scale"
+                        )
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(58.dp)
-                                    .clip(RoundedCornerShape(12.dp))
+                                    .size(66.dp)
+                                    .scale(thumbScale)
+                                    .clip(RoundedCornerShape(13.dp))
                                     .background(DalliSurfaceAlt)
                                     .border(
                                         width = if (selected) 2.dp else 1.dp,
                                         color = if (selected) DalliPrimary else DalliLine,
-                                        shape = RoundedCornerShape(12.dp)
+                                        shape = RoundedCornerShape(13.dp)
                                     )
                                     .clickable { activeImg = i }
                             ) {
@@ -335,7 +341,7 @@ fun DetailsScreen(
                                     model = img,
                                     contentDescription = null,
                                     contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp))
+                                    modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(13.dp))
                                 )
                             }
                             if (product.variantlarYoqilgan && i < product.variantNomlari.size && product.variantNomlari[i].isNotBlank()) {
@@ -351,6 +357,20 @@ fun DetailsScreen(
                         }
                     }
                 }
+            }
+
+            // ─── Rang tanlash — IKKINCHI qator, to'g'ridan-to'g'ri rangRasmlari
+            // orqali (matn moslashtirish emas) ────────────────────────────────
+            if (rangValues.isNotEmpty()) {
+                RangSelector(
+                    rangValues = rangValues,
+                    selectedValue = selectedRangValue,
+                    rangImages = product.rangRasmlari,
+                    onSelect = { value ->
+                        selectedRangValue = value
+                        rangValueToImageIndex[value]?.let { activeImg = it }
+                    }
+                )
             }
 
             // ─── Razmer tanlash ───────────────────────────────────────────────
@@ -735,6 +755,17 @@ fun DetailsScreen(
             }
             } // Column end
         }
+
+        // ─── Full-screen rasm ko'rish ─────────────────────────────────────────
+        if (fullscreenOpen && images.isNotEmpty()) {
+            FullScreenImageViewer(
+                images = images,
+                initialIndex = activeImg.coerceIn(0, images.lastIndex),
+                productName = product.name,
+                onIndexChange = { activeImg = it },
+                onClose = { fullscreenOpen = false }
+            )
+        }
     }
 }
 
@@ -744,9 +775,10 @@ private fun RoundBtn(
     icon: ImageVector,
     onClick: () -> Unit,
     tint: Color = DalliText,
-    badge: Int = 0
+    badge: Int = 0,
+    modifier: Modifier = Modifier
 ) {
-    Box(modifier = Modifier.size(40.dp)) {
+    Box(modifier = modifier.size(40.dp)) {
         Box(
             modifier = Modifier
                 .matchParentSize()
@@ -859,15 +891,15 @@ private fun String.normalizeUz(): String =
 
 /**
  * Rang tanlash — "Rang: {tanlangan}" sarlavhasi va pastda kvadrat swatchlar.
- * Admin "Variantlar" bosqichida shu rangga mos rasm biriktirgan bo'lsa, o'sha
- * haqiqiy rasm ko'rsatiladi; aks holda oddiy rang doirasi chiziladi.
+ * Admin shu rangga to'g'ridan-to'g'ri rasm biriktirgan bo'lsa (product.rangRasmlari),
+ * o'sha haqiqiy rasm ko'rsatiladi — matn moslashtirishga tayanilmaydi; aks holda
+ * oddiy rang doirasi chiziladi.
  */
 @Composable
 private fun RangSelector(
     rangValues: List<String>,
     selectedValue: String?,
-    valueToImageIndex: Map<String, Int>,
-    images: List<String>,
+    rangImages: Map<String, String>,
     onSelect: (String) -> Unit
 ) {
     Column(
@@ -887,30 +919,36 @@ private fun RangSelector(
         ) {
             rangValues.forEach { value ->
                 val isSelected = value == selectedValue
-                val imgIdx = valueToImageIndex[value]
-                val swatchColor = if (imgIdx == null) colorSwatchFor(value) else null
+                val imgUrl = rangImages[value]
+                val swatchColor = if (imgUrl == null) colorSwatchFor(value) else null
+                val chipScale by animateFloatAsState(
+                    targetValue = if (isSelected) 1.1f else 1f,
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+                    label = "rang_chip_scale"
+                )
                 Box(
                     modifier = Modifier
-                        .size(64.dp)
-                        .clip(RoundedCornerShape(14.dp))
+                        .size(72.dp)
+                        .scale(chipScale)
+                        .clip(RoundedCornerShape(16.dp))
                         .background(swatchColor ?: DalliSurfaceAlt)
                         .border(
                             width = if (isSelected) 2.dp else 1.dp,
                             color = if (isSelected) DalliText else DalliLine,
-                            shape = RoundedCornerShape(14.dp)
+                            shape = RoundedCornerShape(16.dp)
                         )
                         .clickable { onSelect(value) },
                     contentAlignment = Alignment.Center
                 ) {
-                    if (imgIdx != null) {
+                    if (imgUrl != null) {
                         AsyncImage(
-                            model = images.getOrNull(imgIdx),
+                            model = imgUrl,
                             contentDescription = value,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
                                 .matchParentSize()
                                 .padding(if (isSelected) 3.dp else 0.dp)
-                                .clip(RoundedCornerShape(11.dp))
+                                .clip(RoundedCornerShape(13.dp))
                         )
                     } else if (swatchColor == null) {
                         // Nomi rang lug'atida yo'q — rasm ham, doira ham chizib bo'lmaydi,
@@ -1072,5 +1110,144 @@ private fun RowScope.InfoChip(
             overflow = TextOverflow.Ellipsis
         )
         Text(label, fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold, color = DalliMuted)
+    }
+}
+
+/**
+ * Full-screen rasm ko'rish rejimi. Sahifalar orasida swipe (HorizontalPager),
+ * har bir rasmda double-tap zoom (majburiy) va pinch-to-zoom (qo'shimcha).
+ * `initialIndex` orqali ochiladi, swipe qilinganda `onIndexChange` orqali
+ * tashqi `activeImg` bilan sinxron turadi. X tugmasi yoki orqaga qaytish
+ * gesture'i bilan yopiladi.
+ */
+@Composable
+private fun FullScreenImageViewer(
+    images: List<String>,
+    initialIndex: Int,
+    productName: String,
+    onIndexChange: (Int) -> Unit,
+    onClose: () -> Unit
+) {
+    BackHandler(onBack = onClose)
+
+    val pagerState = rememberPagerState(initialPage = initialIndex, pageCount = { images.size })
+    var zoomed by remember { mutableStateOf(false) }
+
+    LaunchedEffect(pagerState.currentPage) {
+        onIndexChange(pagerState.currentPage)
+        zoomed = false
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+    ) {
+        HorizontalPager(
+            state = pagerState,
+            userScrollEnabled = !zoomed,
+            modifier = Modifier.fillMaxSize()
+        ) { page ->
+            ZoomableImage(
+                model = images.getOrNull(page),
+                contentDescription = productName,
+                onZoomChange = { zoomed = it }
+            )
+        }
+
+        RoundBtn(
+            icon = Lucide.X,
+            onClick = onClose,
+            tint = DalliText,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .statusBarsPadding()
+                .padding(12.dp)
+        )
+
+        if (images.size > 1) {
+            Text(
+                text = "${pagerState.currentPage + 1} / ${images.size}",
+                color = Color.White,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 18.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color.White.copy(alpha = 0.15f))
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            )
+        }
+    }
+}
+
+/**
+ * Bitta rasm — double-tap bilan zoom in/out (1x <-> 2.5x) va pinch-to-zoom
+ * (1x..4x) qo'llab-quvvatlaydi. Zoom qilinganda pan (surish) ham ishlaydi;
+ * shu sababli tashqi HorizontalPager zoom paytida o'chiriladi (onZoomChange).
+ */
+@Composable
+private fun ZoomableImage(
+    model: String?,
+    contentDescription: String?,
+    onZoomChange: (Boolean) -> Unit
+) {
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offsetX by remember { mutableFloatStateOf(0f) }
+    var offsetY by remember { mutableFloatStateOf(0f) }
+
+    val animatedScale by animateFloatAsState(targetValue = scale, animationSpec = tween(220), label = "zoom_scale")
+    val animatedOffsetX by animateFloatAsState(targetValue = offsetX, animationSpec = tween(220), label = "zoom_offset_x")
+    val animatedOffsetY by animateFloatAsState(targetValue = offsetY, animationSpec = tween(220), label = "zoom_offset_y")
+
+    LaunchedEffect(scale) { onZoomChange(scale > 1.05f) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clipToBounds()
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onDoubleTap = {
+                        if (scale > 1f) {
+                            scale = 1f
+                            offsetX = 0f
+                            offsetY = 0f
+                        } else {
+                            scale = 2.5f
+                        }
+                    }
+                )
+            }
+            .pointerInput(Unit) {
+                detectTransformGestures { _, pan, zoom, _ ->
+                    val newScale = (scale * zoom).coerceIn(1f, 4f)
+                    scale = newScale
+                    if (newScale > 1f) {
+                        offsetX += pan.x
+                        offsetY += pan.y
+                    } else {
+                        offsetX = 0f
+                        offsetY = 0f
+                    }
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        AsyncImage(
+            model = model,
+            contentDescription = contentDescription,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    scaleX = animatedScale
+                    scaleY = animatedScale
+                    translationX = animatedOffsetX
+                    translationY = animatedOffsetY
+                }
+        )
     }
 }

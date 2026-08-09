@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Package, RefreshCw, Pencil, Trash2, X, Check, Search } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Package, RefreshCw, Pencil, Trash2, X, Check, Search, Camera, Loader2 } from 'lucide-react'
 import { api } from '../api'
 import type { Product, User, CategoryTree } from '../types'
 
@@ -43,6 +43,7 @@ type Filter = 'all' | 'inactive' | 'outofstock'
 interface EditForm {
   name: string; price: string; discount: string; description: string
   category: string; subcategory: string; product_type: string
+  rang_rasmlari: Record<string, string>
   variantlar_yoqilgan: boolean
   variant_nomlari: string[]
   variant_narxlari: string[]
@@ -58,11 +59,48 @@ export default function MyProducts({ user }: Props) {
 
   // Edit modal
   const [editProduct, setEditProduct] = useState<Product | null>(null)
-  const [editForm, setEditForm]       = useState<EditForm>({ name: '', price: '', discount: '', description: '', category: '', subcategory: '', product_type: '', variantlar_yoqilgan: false, variant_nomlari: [], variant_narxlari: [] })
+  const [editForm, setEditForm]       = useState<EditForm>({ name: '', price: '', discount: '', description: '', category: '', subcategory: '', product_type: '', rang_rasmlari: {}, variantlar_yoqilgan: false, variant_nomlari: [], variant_narxlari: [] })
   const [categoryTree, setCategoryTree] = useState<CategoryTree>({})
   const [editSaving, setEditSaving]   = useState(false)
   const [editError, setEditError]     = useState('')
   const [sizesByColor, setSizesByColor] = useState<Record<number, {nomi: string, narx: string}[]>>({})
+
+  // "Rang" xususiyati chiplariga rasm biriktirish — "Variantlar (Rang va Narx)"
+  // bo'limidan mustaqil. Faqat mahsulotda tanlangan ranglarga rasm biriktiradi,
+  // rang ro'yxatini o'zi o'zgartirmaydi.
+  const [uploadingColor, setUploadingColor] = useState<string | null>(null)
+  const colorImageInputRef = useRef<HTMLInputElement>(null)
+  const pendingColorRef = useRef<string | null>(null)
+
+  function openColorImagePicker(color: string) {
+    pendingColorRef.current = color
+    colorImageInputRef.current?.click()
+  }
+
+  async function handleColorImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    const color = pendingColorRef.current
+    e.target.value = ''
+    pendingColorRef.current = null
+    if (!file || !color) return
+    setUploadingColor(color)
+    try {
+      const url = await api.uploadImage(file)
+      setEditForm(f => ({ ...f, rang_rasmlari: { ...f.rang_rasmlari, [color]: url } }))
+    } catch (err: any) {
+      setEditError(err.message)
+    } finally {
+      setUploadingColor(null)
+    }
+  }
+
+  function removeColorImage(color: string) {
+    setEditForm(f => {
+      const copy = { ...f.rang_rasmlari }
+      delete copy[color]
+      return { ...f, rang_rasmlari: copy }
+    })
+  }
 
   function addSize(colorIndex: number) {
     setSizesByColor(prev => ({
@@ -126,6 +164,7 @@ export default function MyProducts({ user }: Props) {
       subcategory:         p.subcategory || '',
       product_type:        p.product_type || p.productType || '',
       description:         p.description || '',
+      rang_rasmlari:       { ...(p.rangRasmlari || {}) },
       variantlar_yoqilgan: p.variantlarYoqilgan ?? false,
       variant_nomlari:     p.variantNomlari ?? [],
       variant_narxlari:    (p.variantNarxlari ?? []).map(String),
@@ -168,6 +207,7 @@ export default function MyProducts({ user }: Props) {
         subcategory:         editForm.subcategory,
         product_type:        editForm.product_type,
         description:         editForm.description.trim(),
+        rang_rasmlari:       editForm.rang_rasmlari,
         variantlar_yoqilgan: editForm.variantlar_yoqilgan,
         variant_nomlari:     editForm.variant_nomlari,
         variant_narxlari:    editForm.variant_narxlari.map(s => parseInt(s) || 0),
@@ -182,6 +222,7 @@ export default function MyProducts({ user }: Props) {
               subcategory: editForm.subcategory,
               product_type: editForm.product_type,
               description: editForm.description.trim(),
+              rangRasmlari: editForm.rang_rasmlari,
               variantlarYoqilgan: editForm.variantlar_yoqilgan,
               variantNomlari: editForm.variant_nomlari,
               variantNarxlari: editForm.variant_narxlari.map(s => parseInt(s) || 0),
@@ -571,6 +612,65 @@ export default function MyProducts({ user }: Props) {
                 <label className="text-xs font-bold mb-1.5 block uppercase tracking-wider" style={{ color: 'var(--fg-muted)' }}>Tavsif</label>
                 <textarea className="field w-full resize-none" value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} rows={3} disabled={editSaving} />
               </div>
+
+              {/* Rang rasmlari — "Rang" xususiyati chiplariga rasm biriktirish.
+                  "Ranglar va razmerlar" (Variantlar) bo'limidan mustaqil — bu yerda
+                  faqat mahsulot yaratilganda tanlangan ranglarga rasm biriktiriladi,
+                  yangi rang qo'shilmaydi/o'chirilmaydi. */}
+              {(editProduct?.attributes?.Rang?.length ?? 0) > 0 && (
+                <div>
+                  <label className="text-xs font-bold mb-2 block uppercase tracking-wider" style={{ color: 'var(--fg-muted)' }}>
+                    Rang rasmlari
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {(editProduct?.attributes?.Rang || []).map(color => {
+                      const img = editForm.rang_rasmlari[color]
+                      return (
+                        <div key={color} className="flex items-center gap-2 px-3 py-1.5 rounded-xl" style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                          <button
+                            type="button"
+                            disabled={editSaving}
+                            onClick={() => openColorImagePicker(color)}
+                            title="Rasm biriktirish"
+                            className="relative rounded-full flex-shrink-0 cursor-pointer"
+                            style={{
+                              width: 22, height: 22, padding: 0,
+                              background: img ? `url(${img}) center/cover no-repeat` : 'var(--surface)',
+                              border: '1px solid var(--border)',
+                            }}
+                          >
+                            {uploadingColor === color ? (
+                              <Loader2 size={11} className="animate-spin" style={{ position: 'absolute', inset: 0, margin: 'auto', color: 'var(--fg-muted)' }} />
+                            ) : !img && (
+                              <Camera size={11} style={{ position: 'absolute', inset: 0, margin: 'auto', color: 'var(--fg-muted)' }} />
+                            )}
+                          </button>
+                          <span className="text-xs" style={{ color: 'var(--fg)' }}>{color}</span>
+                          {img && (
+                            <button
+                              type="button"
+                              disabled={editSaving}
+                              onClick={() => removeColorImage(color)}
+                              title="Rasmni olib tashlash"
+                              className="cursor-pointer"
+                              style={{ color: 'var(--fg-muted)', display: 'flex' }}
+                            >
+                              <X size={12} />
+                            </button>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <input
+                    ref={colorImageInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleColorImageSelect}
+                    style={{ display: 'none' }}
+                  />
+                </div>
+              )}
 
               <div className="border-t my-2" style={{ borderColor: 'var(--border)' }}></div>
 

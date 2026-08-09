@@ -79,6 +79,7 @@ export const api = {
     country?: string                          // Ishlab chiqarilgan mamlakat
     guarantee_months?: number                 // Kafolat (oylarda)
     attributes?: Record<string, string[]>     // Xususiyatlar: {"Rang": ["Qora"], ...}
+    rang_rasmlari?: Record<string, string>    // Har bir rangga rasm: {"Qora": "https://...", ...}
     image_url: string
     images: string[]
     rating?: number
@@ -147,6 +148,7 @@ export const api = {
     name?: string; price?: number; discount?: number
     category?: string; subcategory?: string; product_type?: string
     description?: string
+    rang_rasmlari?: Record<string, string>
     variantlar_yoqilgan?: boolean
     variant_nomlari?: string[]
     variant_narxlari?: number[]

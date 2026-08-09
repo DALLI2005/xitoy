@@ -29,6 +29,8 @@ export interface Product {
   added_by_name?: string
   active?: boolean
   inStock?: boolean
+  attributes?: Record<string, string[]>       // {"Rang": ["Qora","Oq"], ...}
+  rangRasmlari?: Record<string, string>        // {"Qora": "https://...jpg", ...}
   variantlarYoqilgan?: boolean
   variantNomlari?: string[]
   variantNarxlari?: number[]
