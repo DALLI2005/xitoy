@@ -350,7 +350,8 @@ fun MainScreen(
                         rootNavController.navigate("login") {
                             popUpTo(0) { inclusive = true }
                         }
-                    }
+                    },
+                    onSuperadminUnlocked = { rootNavController.navigate("superadmin_orders") }
                 )
             }
 

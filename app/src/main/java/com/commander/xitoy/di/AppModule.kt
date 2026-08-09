@@ -6,6 +6,7 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.commander.xitoy.data.remote.AuthApi
 import com.commander.xitoy.data.remote.OrderApi
+import com.commander.xitoy.data.remote.SuperadminApi
 import com.commander.xitoy.data.remote.XitoyApi
 import com.commander.xitoy.data.repository.ProductRepositoryImpl
 import com.commander.xitoy.domain.repository.ProductRepository
@@ -94,6 +95,24 @@ object AppModule {
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(OrderApi::class.java)
+    }
+
+    // Superadmin panel API — bir xil admin.eliboyev.uz serveri, X-Admin-Token
+    // header orqali autentifikatsiya (har bir chaqiruvda alohida beriladi).
+    @Provides
+    @Singleton
+    fun provideSuperadminApi(): SuperadminApi {
+        val okHttpClient = OkHttpClient.Builder()
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .build()
+
+        return Retrofit.Builder()
+            .baseUrl("https://admin.eliboyev.uz/")
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(SuperadminApi::class.java)
     }
 
     // 2. Repository ga Api ni ulab beramiz

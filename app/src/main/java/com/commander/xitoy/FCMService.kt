@@ -72,6 +72,7 @@ class FCMService : FirebaseMessagingService() {
 
     private fun buildIntent(data: Map<String, String>): Intent {
         val productId = data["product_id"]
+        val orderId = data["order_id"]
         return when {
             data["type"] == "product" && !productId.isNullOrEmpty() ->
                 // Mahsulot sahifasiga deep link orqali o'tish
@@ -85,6 +86,15 @@ class FCMService : FirebaseMessagingService() {
                 Intent(this, MainActivity::class.java).apply {
                     putExtra("navigate_to_tab", "cart")
                     addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                }
+            data["type"] == "order" && !orderId.isNullOrEmpty() ->
+                // Superadmin — yangi buyurtma tafsilotiga deep link (sessiya holati
+                // MainActivity.extractRoute'da tekshiriladi: faol bo'lsa to'g'ridan-to'g'ri,
+                // aks holda parol so'rovi orqali).
+                Intent(this, MainActivity::class.java).apply {
+                    action = Intent.ACTION_VIEW
+                    setData(Uri.parse("dalli://superadmin_order/$orderId"))
+                    addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
                 }
             else ->
                 Intent(this, MainActivity::class.java).apply {

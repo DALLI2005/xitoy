@@ -350,6 +350,11 @@ async def _init_admins_db():
             )
         except aiosqlite.OperationalError:
             pass
+        # Superadmin push-bildirishnomalari uchun (ilova FCM tokeni)
+        try:
+            await db.execute("ALTER TABLE admins ADD COLUMN fcm_token TEXT")
+        except aiosqlite.OperationalError:
+            pass
         await db.execute("""
             CREATE TABLE IF NOT EXISTS channels (
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -357,6 +362,24 @@ async def _init_admins_db():
                 label      TEXT    NOT NULL DEFAULT '',
                 enabled    INTEGER NOT NULL DEFAULT 1,
                 created_at TEXT    DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        # Buyurtmalarning to'liq tafsiloti (rang/o'lcham/rasm/soni har bir mahsulot
+        # uchun) — Google Sheets faqat matn xulosasini saqlaydi, shuning uchun
+        # superadmin ilovasidagi to'liq tafsilot va push-deep-link uchun bu yerda
+        # alohida keshlanadi. Holat (status) ham /api/orders/{id}/status orqali
+        # yangilanganda shu yerga ham yoziladi.
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS orders (
+                order_id       TEXT PRIMARY KEY,
+                telegram_id    TEXT NOT NULL,
+                fullname       TEXT DEFAULT '',
+                phone          TEXT DEFAULT '',
+                location_link  TEXT DEFAULT '',
+                jami_summa     INTEGER DEFAULT 0,
+                items_json     TEXT DEFAULT '[]',
+                status         TEXT DEFAULT 'Yangi',
+                created_at     TEXT DEFAULT CURRENT_TIMESTAMP
             )
         """)
         # Superadmin — barcha kategoriyalar
@@ -748,6 +771,46 @@ async def admin_login(data: AdminLoginIn):
         },
     }
 
+
+class SuperadminLoginIn(BaseModel):
+    password: str
+
+
+@app.post("/api/superadmin-login")
+async def superadmin_login(data: SuperadminLoginIn):
+    """Android ilova uchun — faqat parol, telegram_id kerak emas (ilova buni
+    bilishi shart emas). Xuddi admin_login bilan bir xil tekshiruv, lekin
+    doim SUPERADMIN_ID'ga bog'langan holda."""
+    passcode = (data.password or "").strip()
+    if not passcode:
+        raise HTTPException(401, "Parol kiritilishi shart")
+
+    async with aiosqlite.connect(ADMINS_DB_PATH) as db:
+        async with db.execute(
+            "SELECT name, categories, active, password FROM admins WHERE telegram_id = ?", (SUPERADMIN_ID,)
+        ) as cur:
+            row = await cur.fetchone()
+
+    if not row or not row[2]:
+        raise HTTPException(401, "Superadmin topilmadi yoki faol emas")
+
+    db_password = row[3] if len(row) > 3 and row[3] else _DEFAULT_ADMIN_PASSWORD
+    if not hmac.compare_digest(passcode, db_password):
+        raise HTTPException(401, "Parol noto'g'ri")
+
+    token = f"admin_token_{SUPERADMIN_ID}"
+    return {
+        "token": token,
+        "user": {
+            "telegram_id": SUPERADMIN_ID,
+            "name": row[0],
+            "username": "superadmin",
+            "categories": CATEGORIES,
+            "is_superadmin": True,
+        },
+    }
+
+
 class WebAppLoginIn(BaseModel):
     init_data: str
 
@@ -896,6 +959,81 @@ def require_super(user: dict = Depends(get_current_user)):
         raise HTTPException(403, "Faqat superadmin uchun")
     return user
 
+
+# ── Superadmin ilova (Android) — push, buyurtma tafsiloti, parol ────────────────
+class AdminFcmTokenIn(BaseModel):
+    fcm_token: str
+
+
+@app.post("/api/admin/register-fcm-token")
+async def register_admin_fcm_token(data: AdminFcmTokenIn, user: dict = Depends(require_super)):
+    """Superadmin ilovasining FCM tokenini saqlaydi — yangi buyurtma push'lari
+    shu tokenga yuboriladi."""
+    async with aiosqlite.connect(ADMINS_DB_PATH) as db:
+        await db.execute(
+            "UPDATE admins SET fcm_token = ? WHERE telegram_id = ?",
+            (data.fcm_token, user["telegram_id"]),
+        )
+        await db.commit()
+    return {"ok": True}
+
+
+class SuperadminPasswordChangeIn(BaseModel):
+    old_password: str
+    new_password: str
+
+
+@app.post("/api/superadmin/change-password")
+async def change_superadmin_password(
+    data: SuperadminPasswordChangeIn, user: dict = Depends(require_super)
+):
+    if len(data.new_password.strip()) < 4:
+        raise HTTPException(400, "Yangi parol kamida 4 belgidan iborat bo'lishi kerak")
+
+    async with aiosqlite.connect(ADMINS_DB_PATH) as db:
+        async with db.execute(
+            "SELECT password FROM admins WHERE telegram_id = ?", (user["telegram_id"],)
+        ) as cur:
+            row = await cur.fetchone()
+        if not row:
+            raise HTTPException(404, "Admin topilmadi")
+        if not hmac.compare_digest(data.old_password.strip(), row[0]):
+            raise HTTPException(401, "Joriy parol noto'g'ri")
+
+        await db.execute(
+            "UPDATE admins SET password = ? WHERE telegram_id = ?",
+            (data.new_password.strip(), user["telegram_id"]),
+        )
+        await db.commit()
+
+    return {"ok": True}
+
+
+@app.get("/api/admin/orders/{order_id}")
+async def get_admin_order_detail(order_id: str, _: dict = Depends(require_super)):
+    """Bitta buyurtmaning to'liq tafsiloti — har bir mahsulotning rangi/o'lchami/
+    soni/narxi/rasmi bilan. Google Sheets faqat matn xulosasini saqlagani uchun
+    bu ma'lumot lokal keshdan (create_order paytida yozilgan) o'qiladi."""
+    async with aiosqlite.connect(ADMINS_DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM orders WHERE order_id = ?", (order_id,)) as cur:
+            row = await cur.fetchone()
+
+    if not row:
+        raise HTTPException(404, "Buyurtma topilmadi")
+
+    d = dict(row)
+    return {
+        "order_id": d["order_id"],
+        "telegram_id": d["telegram_id"],
+        "fullname": d["fullname"],
+        "phone": d["phone"],
+        "location_link": d["location_link"],
+        "jami_summa": d["jami_summa"],
+        "status": d["status"],
+        "created_at": d["created_at"],
+        "items": json.loads(d["items_json"] or "[]"),
+    }
 
 
 def _shorten_title(text: str, max_words: int = 6, max_chars: int = 48) -> str:
@@ -2066,6 +2204,46 @@ async def send_order_to_admin(order_id: str, data: OrderCreate):
         await asyncio.to_thread(_tg_order_notify, text, data.mahsulot_rasm)
 
 
+async def _cache_order_locally(order_id: str, data: OrderCreate) -> None:
+    """Buyurtmaning to'liq tafsilotini (rang/o'lcham/rasm/soni har bir mahsulot
+    uchun) lokal saqlaydi — Google Sheets bu darajadagi tafsilotni saqlamaydi,
+    ammo superadmin ilovasidagi tafsilot ekrani va push-deep-link uchun kerak."""
+    items_json = json.dumps([item.model_dump() for item in data.mahsulotlar_royxati])
+    async with aiosqlite.connect(ADMINS_DB_PATH) as db:
+        await db.execute(
+            """
+            INSERT OR REPLACE INTO orders
+                (order_id, telegram_id, fullname, phone, location_link, jami_summa, items_json, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'Yangi')
+            """,
+            (order_id, data.telegram_id, data.fullname, data.phone,
+             data.location_link, data.jami_summa, items_json),
+        )
+        await db.commit()
+
+
+async def _notify_superadmin_new_order(order_id: str, data: OrderCreate) -> None:
+    """Superadmin ilovasiga push-bildirishnoma — FCM tokeni ro'yxatdan
+    o'tkazilgan bo'lsagina yuboriladi (aks holda jim o'tkaziladi)."""
+    async with aiosqlite.connect(ADMINS_DB_PATH) as db:
+        async with db.execute(
+            "SELECT fcm_token FROM admins WHERE telegram_id = ?", (SUPERADMIN_ID,)
+        ) as cur:
+            row = await cur.fetchone()
+    fcm_token = row[0] if row and row[0] else ""
+    if not fcm_token:
+        return
+
+    jami_fmt = f"{data.jami_summa:,}".replace(",", " ")
+    mijoz = data.fullname.strip() or "Mijoz"
+    await send_push_notification(
+        fcm_token,
+        "Yangi buyurtma!",
+        f"{mijoz} — {jami_fmt} so'm",
+        {"type": "order", "order_id": order_id},
+    )
+
+
 @app.post("/order/create")
 async def create_order(order: OrderCreate):
     """Buyurtmani Google Sheets ga saqlaydi va adminga Telegram xabari yuboradi."""
@@ -2082,6 +2260,8 @@ async def create_order(order: OrderCreate):
     order_id = result.get("order_id", "DS-?") if isinstance(result, dict) else "DS-?"
 
     await send_order_to_admin(order_id, order)
+    await _cache_order_locally(order_id, order)
+    await _notify_superadmin_new_order(order_id, order)
 
     return {"status": "success", "order_id": order_id}
 
@@ -2216,6 +2396,13 @@ async def admin_update_order_status(
         "order_id": order_id,
         "status":   body.status,
     })
+    # Lokal keshdagi holatni ham yangilaymiz — superadmin ilovasidagi tafsilot
+    # ekrani Sheets'ga qayta murojaat qilmasdan joriy holatni ko'rsatishi uchun.
+    async with aiosqlite.connect(ADMINS_DB_PATH) as db:
+        await db.execute(
+            "UPDATE orders SET status = ? WHERE order_id = ?", (body.status, order_id)
+        )
+        await db.commit()
     # FCM bildirishnoma (background — status yangilanishi bunga bog'liq emas)
     telegram_id = result.get("telegram_id", "") if isinstance(result, dict) else ""
     if telegram_id:

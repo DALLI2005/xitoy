@@ -44,6 +44,7 @@ import androidx.navigation.navArgument
 import com.commander.xitoy.domain.model.NotificationPermissionManager
 import com.commander.xitoy.domain.model.SelectedProductHolder
 import com.commander.xitoy.domain.model.SessionManager
+import com.commander.xitoy.domain.model.SuperadminSessionManager
 import com.commander.xitoy.presentation.common.slideEnter
 import com.commander.xitoy.presentation.common.slideExit
 import com.commander.xitoy.presentation.common.slidePopEnter
@@ -57,6 +58,9 @@ import com.commander.xitoy.presentation.onboarding.OnboardingScreen
 import com.commander.xitoy.presentation.calculator.ProfitCalculatorScreen
 import com.commander.xitoy.presentation.payment.PaymentScreen
 import com.commander.xitoy.presentation.sales.SalesScreen
+import com.commander.xitoy.presentation.superadmin.SuperadminGateScreen
+import com.commander.xitoy.presentation.superadmin.SuperadminOrderDetailScreen
+import com.commander.xitoy.presentation.superadmin.SuperadminOrdersScreen
 import com.commander.xitoy.ui.theme.DalliMuted
 import com.commander.xitoy.ui.theme.DalliPrimary
 import com.commander.xitoy.ui.theme.XitoyTheme
@@ -93,6 +97,11 @@ class MainActivity : ComponentActivity() {
             return when (uri.host) {
                 "product" -> "product/$id"
                 "order"   -> "order/$id"
+                "superadmin_order" ->
+                    // Sessiya faol bo'lsa to'g'ridan-to'g'ri tafsilotga, aks holda
+                    // avval parol so'raladigan gate ekraniga o'tkaziladi.
+                    if (SuperadminSessionManager.isUnlocked()) "superadmin_order/$id"
+                    else "superadmin_gate/$id"
                 else      -> null
             }
         }
@@ -304,6 +313,62 @@ class MainActivity : ComponentActivity() {
                                         launchSingleTop = true
                                     }
                                 }
+                            )
+                        }
+
+                        composable(
+                            "superadmin_orders",
+                            enterTransition = slideEnter,
+                            exitTransition = slideExit,
+                            popEnterTransition = slidePopEnter,
+                            popExitTransition = slidePopExit
+                        ) {
+                            SuperadminOrdersScreen(
+                                onBackClick = { rootNavController.popBackStack() },
+                                onOrderClick = { id -> rootNavController.navigate("superadmin_order/$id") },
+                                onLockedOut = {
+                                    rootNavController.navigate("superadmin_gate/none") {
+                                        popUpTo("superadmin_orders") { inclusive = true }
+                                    }
+                                }
+                            )
+                        }
+
+                        composable(
+                            "superadmin_order/{id}",
+                            enterTransition = slideEnter,
+                            exitTransition = slideExit,
+                            popEnterTransition = slidePopEnter,
+                            popExitTransition = slidePopExit
+                        ) { backStackEntry ->
+                            val id = backStackEntry.arguments?.getString("id") ?: ""
+                            SuperadminOrderDetailScreen(
+                                orderId = id,
+                                onBackClick = { rootNavController.popBackStack() },
+                                onLockedOut = {
+                                    rootNavController.navigate("superadmin_gate/$id") {
+                                        popUpTo("superadmin_order/$id") { inclusive = true }
+                                    }
+                                }
+                            )
+                        }
+
+                        composable(
+                            "superadmin_gate/{orderId}",
+                            enterTransition = slideEnter,
+                            exitTransition = slideExit,
+                            popEnterTransition = slidePopEnter,
+                            popExitTransition = slidePopExit
+                        ) { backStackEntry ->
+                            val orderId = backStackEntry.arguments?.getString("orderId") ?: "none"
+                            SuperadminGateScreen(
+                                onUnlocked = {
+                                    val dest = if (orderId == "none") "superadmin_orders" else "superadmin_order/$orderId"
+                                    rootNavController.navigate(dest) {
+                                        popUpTo("superadmin_gate/$orderId") { inclusive = true }
+                                    }
+                                },
+                                onCancel = { rootNavController.popBackStack() }
                             )
                         }
                     }

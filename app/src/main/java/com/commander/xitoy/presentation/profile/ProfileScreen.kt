@@ -6,6 +6,7 @@ import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -28,11 +31,15 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.SupportAgent
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -54,35 +61,51 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.commander.xitoy.domain.model.NotificationPermissionManager
+import com.commander.xitoy.domain.model.SuperadminSessionManager
+import com.commander.xitoy.presentation.superadmin.SuperadminLoginViewModel
 import com.commander.xitoy.ui.theme.DalliAccentInk
+import com.composables.icons.lucide.Lock
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.MapPin
 import com.composables.icons.lucide.Sparkles
 import com.commander.xitoy.ui.theme.DalliAccentSoft
 import com.commander.xitoy.ui.theme.DalliBackground
+import com.commander.xitoy.ui.theme.DalliError
 import com.commander.xitoy.ui.theme.DalliLine
 import com.commander.xitoy.ui.theme.DalliMuted
 import com.commander.xitoy.ui.theme.DalliPrimary
+import com.commander.xitoy.ui.theme.DalliPrimarySoft
 import com.commander.xitoy.domain.model.SessionManager
 import com.commander.xitoy.ui.theme.DalliSuccess
 import com.commander.xitoy.ui.theme.DalliSurface
 import com.commander.xitoy.ui.theme.DalliText
 import com.commander.xitoy.ui.theme.DalliTextSecondary
+import kotlinx.coroutines.withTimeoutOrNull
 
 // Admin bilan Telegram orqali bog'lanish uchun username (LoginScreen bilan bir xil)
 private const val ADMIN_TELEGRAM_USERNAME = "dalli_shop_admin"
+
+// Superadmin panelni ochish uchun bosib turish muddati — aniq, tizim
+// standart long-press'idan farqli (tasodifan ochilib qolmasligi uchun).
+private const val SUPERADMIN_LONG_PRESS_MS = 3000L
 
 @Composable
 fun ProfileScreen(
     onLoginClick: () -> Unit = {},
     onCalculatorClick: () -> Unit = {},
-    onLogout: () -> Unit = {}
+    onLogout: () -> Unit = {},
+    onSuperadminUnlocked: () -> Unit = {}
 ) {
     val viewModel: ProfileViewModel = hiltViewModel()
     val stats by viewModel.stats.collectAsState()
@@ -94,6 +117,7 @@ fun ProfileScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val notificationsEnabled = remember { mutableStateOf(NotificationPermissionManager.isGranted(context)) }
+    var showSuperadminDialog by remember { mutableStateOf(false) }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -125,7 +149,25 @@ fun ProfileScreen(
             text = "Profil",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.ExtraBold,
-            color = DalliText
+            color = DalliText,
+            // Yashirin superadmin kirish — 3s bosib turish. Sessiya hali amal
+            // qilayotgan bo'lsa parol qayta so'ralmasdan to'g'ridan-to'g'ri o'tadi.
+            modifier = Modifier.pointerInput(Unit) {
+                detectTapGestures(
+                    onPress = {
+                        val longPressed = withTimeoutOrNull(SUPERADMIN_LONG_PRESS_MS) {
+                            tryAwaitRelease()
+                        } == null
+                        if (longPressed) {
+                            if (SuperadminSessionManager.isUnlocked()) {
+                                onSuperadminUnlocked()
+                            } else {
+                                showSuperadminDialog = true
+                            }
+                        }
+                    }
+                )
+            }
         )
         Spacer(modifier = Modifier.height(14.dp))
 
@@ -208,6 +250,125 @@ fun ProfileScreen(
         }
 
         Spacer(modifier = Modifier.height(110.dp))
+    }
+
+    if (showSuperadminDialog) {
+        SuperadminLoginDialog(
+            onDismiss = { showSuperadminDialog = false },
+            onUnlocked = {
+                showSuperadminDialog = false
+                onSuperadminUnlocked()
+            }
+        )
+    }
+}
+
+// -------------------------------------------------------------------------
+// Superadmin panelga kirish — parol dialogi
+// -------------------------------------------------------------------------
+@Composable
+private fun SuperadminLoginDialog(
+    onDismiss: () -> Unit,
+    onUnlocked: () -> Unit
+) {
+    val viewModel: SuperadminLoginViewModel = hiltViewModel()
+    val state by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(state.success) {
+        if (state.success) {
+            viewModel.reset()
+            onUnlocked()
+        }
+    }
+
+    Dialog(onDismissRequest = { if (!state.isLoading) onDismiss() }) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(DalliSurface)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(DalliPrimarySoft),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Lucide.Lock, null, tint = DalliPrimary, modifier = Modifier.size(19.dp))
+                }
+                Text(
+                    "Superadmin panel",
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 17.sp,
+                    color = DalliText
+                )
+            }
+            Text(
+                "Davom etish uchun parolni kiriting",
+                fontSize = 13.sp,
+                color = DalliMuted
+            )
+
+            OutlinedTextField(
+                value = state.password,
+                onValueChange = viewModel::onPasswordChange,
+                placeholder = { Text("Parol") },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { viewModel.submit() }),
+                enabled = !state.isLoading,
+                isError = state.error != null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = DalliPrimary,
+                    unfocusedBorderColor = DalliLine,
+                    focusedTextColor = DalliText,
+                    unfocusedTextColor = DalliText,
+                    cursorColor = DalliPrimary
+                )
+            )
+            state.error?.let { errorText ->
+                Text(errorText, fontSize = 12.5.sp, color = DalliError)
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = { if (!state.isLoading) onDismiss() },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Bekor qilish")
+                }
+                Button(
+                    onClick = { viewModel.submit() },
+                    enabled = !state.isLoading,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = DalliPrimary)
+                ) {
+                    if (state.isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text("Kirish", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -4,6 +4,7 @@ import android.app.Application
 import coil.Coil
 import coil.ImageLoader
 import com.commander.xitoy.domain.model.SessionManager
+import com.commander.xitoy.domain.model.SuperadminSessionManager
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
@@ -16,6 +17,7 @@ class XitoyApp : Application() {
     override fun onCreate() {
         super.onCreate()
         SessionManager.init(this)
+        SuperadminSessionManager.init(this)
         Coil.setImageLoader(imageLoader)
     }
 }
