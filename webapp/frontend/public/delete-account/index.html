@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Akkauntni o'chirish — Dalli Shop</title>
+<meta name="description" content="Dalli Shop ilovasida akkauntni va shaxsiy ma'lumotlarni o'chirish tartibi: qanday so'rov yuborish, qaysi ma'lumotlar o'chiriladi va qaysilari saqlanib qoladi." />
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1a1a1a;
+    --muted: #5c5c5c;
+    --line: #e3e3e3;
+    --accent: #c8102e;
+    --card: #f7f7f8;
+    --ok: #0a7d3f;
+    --warn-bg: #fff8e6;
+    --warn-line: #e8d08a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #131315;
+      --fg: #ececec;
+      --muted: #a0a0a5;
+      --line: #2c2c30;
+      --accent: #ff5a72;
+      --card: #1c1c20;
+      --ok: #4ac07d;
+      --warn-bg: #2a2317;
+      --warn-line: #4d4128;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 28px 20px 64px; }
+  header { border-bottom: 1px solid var(--line); padding-bottom: 20px; margin-bottom: 28px; }
+  h1 { font-size: 1.6rem; line-height: 1.3; margin: 0 0 8px; letter-spacing: -0.01em; }
+  h2 { font-size: 1.15rem; margin: 36px 0 12px; letter-spacing: -0.01em; padding-top: 4px; }
+  h2 .num { color: var(--accent); font-variant-numeric: tabular-nums; margin-right: 8px; }
+  .meta { color: var(--muted); font-size: 0.92rem; margin: 0; }
+  ul { padding-left: 22px; margin: 12px 0; }
+  li { margin-bottom: 8px; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; word-break: break-word; }
+  .app-id {
+    display: inline-block; background: var(--card); border: 1px solid var(--line);
+    border-radius: 8px; padding: 2px 8px; font-size: 0.9rem; color: var(--muted);
+  }
+
+  /* Ko'zga tashlanadigan asosiy blok — Google talabi */
+  .cta {
+    background: var(--card); border: 2px solid var(--accent); border-radius: 14px;
+    padding: 20px 18px; margin: 24px 0;
+  }
+  .cta h3 { margin: 0 0 14px; font-size: 1.1rem; }
+  .steps { list-style: none; padding: 0; margin: 0; counter-reset: s; }
+  .steps > li {
+    counter-increment: s; position: relative; padding-left: 42px; margin-bottom: 16px;
+  }
+  .steps > li::before {
+    content: counter(s);
+    position: absolute; left: 0; top: 1px;
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    font-size: 0.92rem; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .steps strong { display: block; }
+  .mailbtn {
+    display: inline-block; background: var(--accent); color: #fff !important;
+    text-decoration: none; font-weight: 600;
+    padding: 13px 22px; border-radius: 10px; margin-top: 6px;
+  }
+  .fields {
+    background: var(--bg); border: 1px dashed var(--line); border-radius: 10px;
+    padding: 12px 14px; margin: 10px 0 0;
+  }
+  .fields ul { margin: 6px 0 0; }
+
+  .row {
+    border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px 16px; margin-bottom: 10px; background: var(--card);
+  }
+  .row .what { font-weight: 600; display: block; margin-bottom: 4px; }
+  .row .why { color: var(--muted); font-size: 0.94rem; display: block; }
+  .keep { border-left: 3px solid var(--warn-line); }
+  .del  { border-left: 3px solid var(--ok); }
+  .term {
+    display: inline-block; font-size: 0.78rem; font-weight: 600;
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: 1px 9px; margin-left: 6px; color: var(--muted); white-space: nowrap;
+  }
+  .note {
+    background: var(--warn-bg); border: 1px solid var(--warn-line); border-radius: 12px;
+    padding: 14px 16px; margin: 20px 0;
+  }
+  .note p { margin: 0; }
+  footer {
+    margin-top: 44px; padding-top: 20px; border-top: 1px solid var(--line);
+    color: var(--muted); font-size: 0.9rem;
+  }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Akkauntni va ma'lumotlarni o'chirish</h1>
+  <p class="meta">
+    <strong>Dalli Shop</strong> mobil ilovasi
+    <span class="app-id">com.commander.xitoy</span><br />
+    Dasturchi: Dilshodbek Eliboyev · Oxirgi yangilanish: 2026-yil 12-avgust
+  </p>
+</header>
+
+<p>
+  Ushbu sahifada <strong>Dalli Shop</strong> ilovasi foydalanuvchilari o'z
+  akkauntini va u bilan bog'liq shaxsiy ma'lumotlarini qanday o'chirishi
+  mumkinligi tushuntirilgan. So'rov bepul va hech qanday sabab ko'rsatishni
+  talab qilmaydi.
+</p>
+
+<div class="cta">
+  <h3>Akkauntni o'chirish uchun quyidagi qadamlarni bajaring</h3>
+  <ol class="steps">
+    <li>
+      <strong>Quyidagi manzilga elektron xat yozing:</strong>
+      <a class="mailbtn"
+         href="mailto:dilshodbekeliboyev2005@gmail.com?subject=Akkauntni%20o'chirish%20so'rovi&amp;body=Assalomu%20alaykum.%0A%0ADalli%20Shop%20ilovasidagi%20akkauntimni%20va%20shaxsiy%20ma'lumotlarimni%20o'chirishingizni%20so'rayman.%0A%0ARo'yxatdan%20o'tgan%20telefon%20raqamim%3A%20%2B998%0AIsm%20va%20familiyam%3A%20%0A%0AHurmat%20bilan%2C">
+        dilshodbekeliboyev2005@gmail.com
+      </a>
+    </li>
+    <li>
+      <strong>Xat mavzusiga yozing:</strong> «Akkauntni o'chirish so'rovi»
+    </li>
+    <li>
+      <strong>Xat matnida quyidagilarni ko'rsating:</strong>
+      <div class="fields">
+        <ul>
+          <li>ilovada <strong>ro'yxatdan o'tgan telefon raqamingiz</strong>
+            (masalan +998 90 123 45 67) — akkauntni topish uchun shu raqam
+            ishlatiladi;</li>
+          <li>akkauntda ko'rsatilgan <strong>ism va familiyangiz</strong>;</li>
+          <li>so'rovingiz aniq bo'lishi uchun: «akkauntimni butunlay
+            o'chiring» degan jumla.</li>
+        </ul>
+      </div>
+    </li>
+    <li>
+      <strong>Shaxsingizni tasdiqlang.</strong> Boshqa shaxs sizning
+      akkauntingizni o'chirib yubormasligi uchun biz siz ko'rsatgan telefon
+      raqamiga qo'ng'iroq qilib yoki SMS yuborib so'rovni tasdiqlaymiz.
+    </li>
+    <li>
+      <strong>Javobni kuting.</strong> So'rov <strong>30 kun ichida</strong>
+      ko'rib chiqiladi va bajariladi. Ma'lumotlar o'chirilgach, xatingizga
+      javob xat yuboriladi.
+    </li>
+  </ol>
+</div>
+
+<h2><span class="num">1.</span>Butunlay o'chiriladigan ma'lumotlar</h2>
+<p>So'rov bajarilgach quyidagilar serverdan <strong>qaytarib bo'lmaydigan tarzda</strong> o'chiriladi:</p>
+
+<div class="row del">
+  <span class="what">Akkaunt ma'lumotlari</span>
+  <span class="why">Ism va familiya, telefon raqami, parol (shifrlangan xesh va salt qiymati), akkaunt identifikatori va ro'yxatdan o'tgan sana.</span>
+</div>
+<div class="row del">
+  <span class="what">Kirish sessiyasi</span>
+  <span class="why">Sessiya tokeni — o'chirilgandan so'ng ilovaga bu akkaunt bilan kirib bo'lmaydi.</span>
+</div>
+<div class="row del">
+  <span class="what">Sevimli mahsulotlar ro'yxati</span>
+  <span class="why">Siz saqlab qo'ygan barcha mahsulotlar.</span>
+</div>
+<div class="row del">
+  <span class="what">Push bildirishnoma tokeni</span>
+  <span class="why">Qurilmangizga bildirishnoma yuborish uchun ishlatiladigan Firebase (FCM) tokeni. O'chirilgach ilovadan hech qanday bildirishnoma kelmaydi.</span>
+</div>
+<div class="row del">
+  <span class="what">To'lov cheklari suratlari</span>
+  <span class="why">Buyurtmalarni to'lashda yuklagan kvitansiya rasmlaringiz.</span>
+</div>
+
+<h2><span class="num">2.</span>Saqlanib qoladigan ma'lumotlar va sabablari</h2>
+<p>
+  Ayrim yozuvlar qonun talabi bilan darhol o'chirilmaydi. Ular
+  <strong>akkauntingizdan uziladi</strong> — ya'ni ilovaga kirish, buyurtma
+  berish yoki profilni tiklash uchun ishlatilmaydi — va quyidagi muddat
+  o'tgach butunlay o'chiriladi:
+</p>
+
+<div class="row keep">
+  <span class="what">Buyurtmalar tarixi <span class="term">5 yil</span></span>
+  <span class="why">
+    Buyurtma raqami, sana, mahsulotlar ro'yxati, summa, yetkazib berish manzili
+    hamda unga biriktirilgan ism va telefon raqami. Sabab: buxgalteriya hisobi,
+    soliq hisoboti va moliyaviy hujjatlarni saqlash bo'yicha O'zbekiston
+    Respublikasi qonunchiligi talabi. Muddat tugagach yozuvlar o'chiriladi yoki
+    shaxsni aniqlab bo'lmaydigan holatga keltiriladi.
+  </span>
+</div>
+<div class="row keep">
+  <span class="what">Ommaviy ofertaga rozilik yozuvi <span class="term">3 yil</span></span>
+  <span class="why">
+    Qaysi sanada va oferta shartlarining qaysi versiyasiga rozilik
+    bildirganingiz, unga biriktirilgan ism va telefon raqami bilan. Sabab: bu
+    yozuv tomonlar o'rtasida shartnoma tuzilganining huquqiy dalili bo'lib,
+    da'vo muddati davomida saqlanishi zarur.
+  </span>
+</div>
+
+<div class="note">
+  <p>
+    <strong>Faqat ayrim ma'lumotni o'chirmoqchimisiz?</strong> Akkauntni butunlay
+    o'chirmasdan, masalan sevimlilar ro'yxatini tozalash yoki bildirishnomalarni
+    to'xtatishni so'rashingiz mumkin — xatingizda aynan nimani o'chirish
+    kerakligini yozing.
+  </p>
+</div>
+
+<h2><span class="num">3.</span>O'chirishdan keyin nima bo'ladi</h2>
+<ul>
+  <li>Akkauntingizga kirish imkoni butunlay to'xtaydi;</li>
+  <li>Bir xil telefon raqami bilan keyinchalik yangi akkaunt ochishingiz mumkin,
+    lekin eski buyurtmalar tarixi unga bog'lanmaydi;</li>
+  <li>Zaxira (backup) nusxalarida qolgan ma'lumotlar navbatdagi zaxira
+    almashinuvida, ko'pi bilan <strong>90 kun</strong> ichida yo'q qilinadi;</li>
+  <li>O'chirish qaytarib bo'lmaydi — ma'lumotlarni tiklashning imkoni yo'q.</li>
+</ul>
+
+<h2><span class="num">4.</span>Bog'lanish</h2>
+<ul>
+  <li>Email: <a href="mailto:dilshodbekeliboyev2005@gmail.com">dilshodbekeliboyev2005@gmail.com</a></li>
+  <li>Ilova: Dalli Shop (Android) — <span class="app-id">com.commander.xitoy</span></li>
+  <li>Dasturchi: Dilshodbek Eliboyev</li>
+  <li>Hudud: O'zbekiston Respublikasi, Farg'ona viloyati, Rishton</li>
+</ul>
+
+<footer>
+  Shuningdek qarang: <a href="/privacy/">Maxfiylik siyosati</a><br />
+  © 2026 Dalli Shop. Barcha huquqlar himoyalangan.
+</footer>
+
+</div>
+</body>
+</html>
