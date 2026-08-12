@@ -2,6 +2,7 @@ package com.commander.xitoy.data.remote
 
 import com.google.gson.annotations.SerializedName
 import retrofit2.http.Body
+import retrofit2.http.GET
 import retrofit2.http.POST
 
 data class FcmTokenRequest(
@@ -10,9 +11,18 @@ data class FcmTokenRequest(
 )
 
 data class RegisterRequest(
-    @SerializedName("fullname") val fullname: String,
-    @SerializedName("phone")    val phone: String,
-    @SerializedName("password") val password: String
+    @SerializedName("fullname")       val fullname: String,
+    @SerializedName("phone")          val phone: String,
+    @SerializedName("password")       val password: String,
+    @SerializedName("offer_accepted") val offerAccepted: Boolean,
+    @SerializedName("offer_version")  val offerVersion: String
+)
+
+data class OfferResponse(
+    @SerializedName("version")    val version: String,
+    @SerializedName("updated_at") val updatedAt: String,
+    @SerializedName("title")      val title: String,
+    @SerializedName("content")    val content: String
 )
 
 data class LoginRequest(
@@ -52,4 +62,7 @@ interface AuthApi {
 
     @POST("auth/register-fcm-token")
     suspend fun registerFcmToken(@Body request: FcmTokenRequest): Map<String, String>
+
+    @GET("api/offer")
+    suspend fun getOffer(): OfferResponse
 }

@@ -27,6 +27,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -48,12 +50,18 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -80,6 +88,7 @@ private const val ADMIN_TELEGRAM_USERNAME = "dalli_shop_admin"
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
+    onOfferClick: () -> Unit = {},
     viewModel: LoginViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -270,6 +279,23 @@ fun LoginScreen(
                         error = uiState.confirmError,
                         enabled = !uiState.isLoading
                     )
+
+                    Spacer(Modifier.height(14.dp))
+                    OfferConsentRow(
+                        checked = uiState.offerAccepted,
+                        enabled = !uiState.isLoading,
+                        onCheckedChange = viewModel::onOfferAcceptedChange,
+                        onOfferClick = onOfferClick
+                    )
+                    if (uiState.offerError != null) {
+                        Text(
+                            text = uiState.offerError!!,
+                            color = DalliError,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+                        )
+                    }
                 }
 
                 if (uiState.generalError != null) {
@@ -289,6 +315,7 @@ fun LoginScreen(
                 GradientSubmitButton(
                     text = if (uiState.mode == AuthMode.LOGIN) "Kirish" else "Ro'yxatdan o'tish",
                     isLoading = uiState.isLoading,
+                    enabled = uiState.mode == AuthMode.LOGIN || uiState.offerAccepted,
                     onClick = { viewModel.submit() }
                 )
 
@@ -455,14 +482,68 @@ private fun PasswordField(
 }
 
 @Composable
+private fun OfferConsentRow(
+    checked: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    onOfferClick: () -> Unit
+) {
+    val annotatedText = remember {
+        buildAnnotatedString {
+            append("Men ")
+            pushStringAnnotation(tag = "offer", annotation = "offer")
+            withStyle(
+                SpanStyle(
+                    color = DalliPrimary,
+                    fontWeight = FontWeight.Bold,
+                    textDecoration = TextDecoration.Underline
+                )
+            ) {
+                append("ommaviy oferta shartlariga")
+            }
+            pop()
+            append(" roziman")
+        }
+    }
+
+    Row(verticalAlignment = Alignment.Top, modifier = Modifier.fillMaxWidth()) {
+        Checkbox(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            enabled = enabled,
+            colors = CheckboxDefaults.colors(
+                checkedColor = DalliPrimary,
+                uncheckedColor = DalliLine,
+                checkmarkColor = Color.White
+            ),
+            modifier = Modifier.size(44.dp)
+        )
+        ClickableText(
+            text = annotatedText,
+            style = TextStyle(fontSize = 13.5.sp, color = DalliMuted, lineHeight = 19.sp),
+            modifier = Modifier
+                .weight(1f)
+                .padding(top = 12.dp, end = 4.dp),
+            onClick = { offset ->
+                if (!enabled) return@ClickableText
+                annotatedText.getStringAnnotations(tag = "offer", start = offset, end = offset)
+                    .firstOrNull()?.let { onOfferClick() }
+            }
+        )
+    }
+}
+
+@Composable
 private fun GradientSubmitButton(
     text: String,
     isLoading: Boolean,
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
+    val isEnabled = enabled && !isLoading
     Button(
         onClick = onClick,
-        enabled = !isLoading,
+        enabled = isEnabled,
         modifier = Modifier
             .fillMaxWidth()
             .height(56.dp)
@@ -485,7 +566,10 @@ private fun GradientSubmitButton(
                 .fillMaxSize()
                 .background(
                     Brush.horizontalGradient(
-                        colors = listOf(DalliPrimary, DalliPrimaryDark)
+                        colors = if (isEnabled)
+                            listOf(DalliPrimary, DalliPrimaryDark)
+                        else
+                            listOf(DalliMuted, DalliMuted)
                     )
                 ),
             contentAlignment = Alignment.Center

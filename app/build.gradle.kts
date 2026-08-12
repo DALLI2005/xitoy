@@ -1,3 +1,76 @@
+import java.io.FileInputStream
+import java.util.Properties
+
+// ── Release imzolash kaliti ────────────────────────────────────────────────────
+// Kalit ma'lumotlari (store path, parollar, alias) KODGA YOZILMAYDI.
+// Ular local.properties dan o'qiladi (bu fayl .gitignore'da), yoki CI uchun
+// bir xil nomdagi muhit o'zgaruvchilaridan (environment variables).
+//
+// local.properties ga qo'shiladigan satrlar (namuna):
+//   XITOY_STORE_FILE=/Users/a1/keystores/xitoy-upload.jks
+//   XITOY_STORE_PASSWORD=...
+//   XITOY_KEY_ALIAS=xitoy-upload
+//   XITOY_KEY_PASSWORD=...
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) FileInputStream(f).use { load(it) }
+}
+
+val missingSigningKeys = mutableListOf<String>()
+
+fun signingValue(key: String): String? {
+    val v = (localProps.getProperty(key) ?: System.getenv(key))?.trim()
+    if (v.isNullOrEmpty()) {
+        missingSigningKeys += key
+        return null
+    }
+    return v
+}
+
+val storeFilePath = signingValue("XITOY_STORE_FILE")
+val storePasswordValue = signingValue("XITOY_STORE_PASSWORD")
+val keyAliasValue = signingValue("XITOY_KEY_ALIAS")
+val keyPasswordValue = signingValue("XITOY_KEY_PASSWORD")
+
+// Nisbiy yo'l berilsa — loyiha ildiziga nisbatan hisoblanadi.
+val resolvedStoreFile = storeFilePath?.let {
+    val f = File(it)
+    if (f.isAbsolute) f else rootProject.file(it)
+}
+
+val hasReleaseSigning = missingSigningKeys.isEmpty() && resolvedStoreFile?.exists() == true
+
+// Release artefakt yig'ilayotgan bo'lsa-yu kalit topilmasa — tushunarli xato bilan
+// to'xtaymiz (debug kalit bilan imzolangan .aab ni Google Play qabul qilmaydi).
+gradle.taskGraph.whenReady {
+    // Faqat haqiqiy imzolash task'lari — AGP'ning ichki `packageReleaseResources`
+    // kabi task'lari bilan adashtirmaslik uchun nomlar aniq ko'rsatilgan.
+    val buildingRelease = allTasks.any { t ->
+        t.name == "packageRelease" || t.name == "packageReleaseBundle" ||
+            t.name.startsWith("signRelease")
+    }
+    if (buildingRelease && !hasReleaseSigning) {
+        val reason = when {
+            missingSigningKeys.isNotEmpty() ->
+                "local.properties (yoki environment) da yo'q: ${missingSigningKeys.joinToString(", ")}"
+            else -> "keystore fayli topilmadi: $resolvedStoreFile"
+        }
+        throw GradleException(
+            """
+            |Release imzolash kaliti sozlanmagan — $reason
+            |
+            |Tuzatish: upload keystore yarating va local.properties ga quyidagilarni qo'shing:
+            |  XITOY_STORE_FILE=/absolute/path/to/xitoy-upload.jks
+            |  XITOY_STORE_PASSWORD=<store paroli>
+            |  XITOY_KEY_ALIAS=xitoy-upload
+            |  XITOY_KEY_PASSWORD=<key paroli>
+            |
+            |local.properties .gitignore'da — parollar repositoriyga tushmaydi.
+            """.trimMargin()
+        )
+    }
+}
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -21,6 +94,19 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        // Kalit sozlanmagan bo'lsa config umuman yaratilmaydi — shunda debug
+        // build'lar (va `gradlew tasks` kabi buyruqlar) kalitsiz ham ishlayveradi.
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = resolvedStoreFile
+                storePassword = storePasswordValue
+                keyAlias = keyAliasValue
+                keyPassword = keyPasswordValue
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -29,7 +115,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug") // TEST UCHUN vaqtincha
+            signingConfig = signingConfigs.findByName("release")
         }
         debug {
             isMinifyEnabled = false

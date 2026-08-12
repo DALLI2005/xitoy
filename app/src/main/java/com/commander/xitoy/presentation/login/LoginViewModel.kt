@@ -26,10 +26,13 @@ data class AuthUiState(
     val phoneDigits: String = "",      // +998 dan keyingi 9 ta raqam
     val password: String = "",
     val confirmPassword: String = "",
+    val offerAccepted: Boolean = false,
+    val offerVersion: String = "",     // fon rejimida GET /api/offer dan oldindan yuklanadi
     val fullnameError: String? = null,
     val phoneError: String? = null,
     val passwordError: String? = null,
     val confirmError: String? = null,
+    val offerError: String? = null,
     val generalError: String? = null,
     val isLoading: Boolean = false,
     val isSuccess: Boolean = false
@@ -43,14 +46,35 @@ class LoginViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(AuthUiState())
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
+    init {
+        fetchOfferVersion()
+    }
+
+    private fun fetchOfferVersion() {
+        viewModelScope.launch {
+            try {
+                val offer = authApi.getOffer()
+                _uiState.value = _uiState.value.copy(offerVersion = offer.version)
+            } catch (_: Exception) {
+                // Ro'yxatdan o'tishda qayta uriniladi (submit paytida versiya bo'sh
+                // bo'lsa xatolik ko'rsatiladi) — fon xatosini shu yerda ko'rsatmaymiz
+            }
+        }
+    }
+
     fun switchMode(mode: AuthMode) {
         if (_uiState.value.isLoading) return
         _uiState.value = _uiState.value.copy(
             mode = mode,
             fullnameError = null, phoneError = null,
             passwordError = null, confirmError = null,
-            generalError = null
+            offerError = null, generalError = null
         )
+    }
+
+    fun onOfferAcceptedChange(value: Boolean) {
+        _uiState.value = _uiState.value.copy(offerAccepted = value, offerError = null, generalError = null)
+        if (value && _uiState.value.offerVersion.isEmpty()) fetchOfferVersion()
     }
 
     fun onFullnameChange(value: String) {
@@ -78,6 +102,7 @@ class LoginViewModel @Inject constructor(
         var phoneError: String? = null
         var passwordError: String? = null
         var confirmError: String? = null
+        var offerError: String? = null
 
         if (s.mode == AuthMode.REGISTER && s.fullname.trim().length < 3) {
             fullnameError = "Ism kamida 3 belgidan iborat bo'lishi kerak"
@@ -91,15 +116,19 @@ class LoginViewModel @Inject constructor(
         if (s.mode == AuthMode.REGISTER && s.confirmPassword != s.password) {
             confirmError = "Parollar mos kelmadi"
         }
+        if (s.mode == AuthMode.REGISTER && !s.offerAccepted) {
+            offerError = "Ommaviy oferta shartlariga rozilik bildirilishi shart"
+        }
 
         _uiState.value = s.copy(
             fullnameError = fullnameError,
             phoneError = phoneError,
             passwordError = passwordError,
-            confirmError = confirmError
+            confirmError = confirmError,
+            offerError = offerError
         )
         return fullnameError == null && phoneError == null &&
-            passwordError == null && confirmError == null
+            passwordError == null && confirmError == null && offerError == null
     }
 
     fun submit() {
@@ -114,7 +143,9 @@ class LoginViewModel @Inject constructor(
                         RegisterRequest(
                             fullname = s.fullname.trim(),
                             phone = fullPhone(),
-                            password = s.password
+                            password = s.password,
+                            offerAccepted = s.offerAccepted,
+                            offerVersion = s.offerVersion
                         )
                     )
                 } else {

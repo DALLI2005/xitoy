@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Package, Settings, ShoppingBag, LogOut, ShieldCheck, User as UserIcon, Menu, X, Users } from 'lucide-react'
+import { Plus, Package, Settings, ShoppingBag, LogOut, ShieldCheck, User as UserIcon, Menu, X, Users, FileText } from 'lucide-react'
 import { api } from './api'
 import Login from './pages/Login'
 import AddProduct from './pages/AddProduct'
@@ -7,6 +7,7 @@ import MyProducts from './pages/MyProducts'
 import AdminPanel from './pages/AdminPanel'
 import OrdersPage from './pages/OrdersPage'
 import AppUsers from './pages/AppUsers'
+import OfferEditor from './pages/OfferEditor'
 import type { User, Page } from './types'
 
 export default function App() {
@@ -70,6 +71,7 @@ export default function App() {
     { id: 'orders', label: 'Buyurtmalar',icon: ShoppingBag },
     ...(user.is_superadmin ? [{ id: 'admins' as Page, label: 'Xodimlar (Adminlar)', icon: Settings }] : []),
     ...(user.is_superadmin ? [{ id: 'users' as Page, label: 'Mijozlar', icon: Users }] : []),
+    ...(user.is_superadmin ? [{ id: 'offer' as Page, label: 'Ommaviy oferta', icon: FileText }] : []),
   ]
 
   return (
@@ -174,6 +176,7 @@ export default function App() {
             {page === 'orders' && <OrdersPage />}
             {page === 'admins' && user.is_superadmin && <AdminPanel />}
             {page === 'users'  && user.is_superadmin && <AppUsers />}
+            {page === 'offer'  && user.is_superadmin && <OfferEditor />}
           </div>
         </main>
       </div>

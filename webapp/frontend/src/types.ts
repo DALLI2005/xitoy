@@ -47,11 +47,20 @@ export interface Admin {
 }
 
 export interface AppUser {
-  user_id:         number
-  phone:           string
-  fullname:        string
-  created_at:      number
-  favorites_count: number
+  user_id:            number
+  phone:              string
+  fullname:           string
+  created_at:         number
+  favorites_count:    number
+  offer_version?:     string | null
+  offer_accepted_at?: number | null
+}
+
+export interface OfferDocument {
+  version:    string
+  updated_at: string
+  title:      string
+  content:    string
 }
 
 export type AppUserSort = 'date_desc' | 'date_asc' | 'favorites_desc'
@@ -75,4 +84,4 @@ export interface Order {
   sana:          string
 }
 
-export type Page = 'add' | 'list' | 'admins' | 'orders' | 'users'
+export type Page = 'add' | 'list' | 'admins' | 'orders' | 'users' | 'offer'

@@ -257,4 +257,28 @@ export const api = {
       headers: headers(),
       body: JSON.stringify({ text }),
     }),
+
+  getOffer: () =>
+    request<import('./types').OfferDocument>('/offer', { headers: headers() }),
+
+  updateOffer: (data: { version: string; title: string; content: string }) =>
+    request<import('./types').OfferDocument>('/admin/offer', {
+      method: 'PUT',
+      headers: headers(),
+      body: JSON.stringify(data),
+    }),
+
+  offerAcceptances: (params: { user_id?: number; page?: number; page_size?: number } = {}) => {
+    const qs = new URLSearchParams()
+    if (params.user_id)   qs.set('user_id', String(params.user_id))
+    if (params.page)      qs.set('page', String(params.page))
+    if (params.page_size) qs.set('page_size', String(params.page_size))
+    const suffix = qs.toString() ? `?${qs.toString()}` : ''
+    return request<{
+      items: { id: number; user_id: number; offer_version: string; accepted_at: number; phone: string; fullname: string }[]
+      total_count: number
+      page: number
+      page_size: number
+    }>(`/admin/offer-acceptances${suffix}`, { headers: headers() })
+  },
 }

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -64,7 +65,12 @@ fun SuperadminGateScreen(
         if (state.success) onUnlocked()
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(DalliBackground)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(DalliBackground)
+            .statusBarsPadding()
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically

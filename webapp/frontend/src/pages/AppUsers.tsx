@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   Users, Search, Trash2, Loader2, AlertCircle, Phone, KeyRound, Wand2, Copy, CheckCircle2, X,
-  Heart, ChevronLeft, ChevronRight, Calendar,
+  Heart, ChevronLeft, ChevronRight, Calendar, FileCheck2,
 } from 'lucide-react'
 import { api } from '../api'
 import { hapticSuccess, hapticError } from '../telegram'
@@ -284,6 +284,12 @@ export default function AppUsers() {
                   </p>
                   <p className="text-xs mt-0.5" style={{ color: 'var(--fg-muted)', opacity: 0.7 }}>
                     Ro'yxatdan o'tgan: {fmtDate(u.created_at)}
+                  </p>
+                  <p className="text-xs mt-0.5 flex items-center gap-1" style={{ color: u.offer_accepted_at ? 'var(--fg-muted)' : '#f87171', opacity: u.offer_accepted_at ? 0.7 : 1 }}>
+                    <FileCheck2 size={11} />
+                    {u.offer_accepted_at
+                      ? `Oferta: v${u.offer_version} · ${fmtDate(u.offer_accepted_at)}`
+                      : 'Oferta: rozilik yo\'q'}
                   </p>
                 </div>
               </div>

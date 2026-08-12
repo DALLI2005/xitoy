@@ -91,6 +91,11 @@ from categories import (  # noqa: E402
     resolve as resolve_category,
     roots_containing,
 )
+from offer_text import (  # noqa: E402
+    OFFER_CONTENT,
+    OFFER_TITLE,
+    OFFER_VERSION,
+)
 
 # Sarlavha qisqartirish uchun keraksiz marketing so'zlari ro'yxati
 # (real tarjima natijalarini ko'rib, kengaytirish mumkin)
@@ -382,6 +387,33 @@ async def _init_admins_db():
                 created_at     TEXT DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        # Ommaviy oferta (foydalanish shartlari) — matn kodda emas, shu jadvalda
+        # saqlanadi, shunda superadmin uni webapp orqali yangilay oladi (kodni
+        # qayta deploy qilmasdan). Bir vaqtda faqat bitta yozuv is_active=1 bo'ladi;
+        # yangi versiya qo'shilganda eskisi is_active=0 qilinadi (tarix saqlanadi —
+        # kim qaysi versiyaga rozilik berganini bilish uchun kerak).
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS offer_documents (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                version    TEXT    NOT NULL,
+                title      TEXT    NOT NULL,
+                content    TEXT    NOT NULL,
+                updated_at INTEGER NOT NULL,
+                is_active  INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+        async with db.execute("SELECT COUNT(*) FROM offer_documents") as cur:
+            (offer_doc_count,) = await cur.fetchone()
+        if offer_doc_count == 0:
+            # Birinchi ishga tushirish — offer_text.py dagi vaqtinchalik matn
+            # urug' (seed) sifatida kiritiladi, shunda hech narsa buzilmaydi.
+            await db.execute(
+                """
+                INSERT INTO offer_documents (version, title, content, updated_at, is_active)
+                VALUES (?, ?, ?, ?, 1)
+                """,
+                (OFFER_VERSION, OFFER_TITLE, OFFER_CONTENT, int(time())),
+            )
         # Superadmin — barcha kategoriyalar
         await db.execute("""
             INSERT OR IGNORE INTO admins (telegram_id, name, categories)
@@ -417,6 +449,46 @@ async def _init_users_db():
         """)
         await db.execute("CREATE INDEX IF NOT EXISTS idx_app_users_phone ON app_users(phone)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_app_users_token ON app_users(session_token)")
+        # Ommaviy oferta roziligi — qachon va qaysi versiyaga rozi bo'lingani
+        # (oferta yangilanganda eski/yangi versiyaga rozi bo'lganlarni ajratish uchun)
+        try:
+            await db.execute("ALTER TABLE app_users ADD COLUMN offer_accepted_at INTEGER")
+        except aiosqlite.OperationalError:
+            pass
+        try:
+            await db.execute("ALTER TABLE app_users ADD COLUMN offer_version TEXT")
+        except aiosqlite.OperationalError:
+            pass
+        # To'liq tarixli rozilik jurnali — huquqiy isbot uchun app_users'dagi
+        # ikkita ustundan ko'ra ishonchliroq (oferta har yangilanganda eski
+        # yozuvlar saqlanib qoladi, faqat oxirgisi emas). phone/fullname ham
+        # nusxa qilinadi — foydalanuvchi keyin ismini o'zgartirsa yoki akkaunt
+        # o'chirilsa ham, rozilik berilgan paytdagi holat saqlanib qolishi uchun.
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS offer_acceptances (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id       INTEGER NOT NULL,
+                offer_version TEXT    NOT NULL,
+                accepted_at   INTEGER NOT NULL,
+                phone         TEXT    NOT NULL DEFAULT '',
+                fullname      TEXT    NOT NULL DEFAULT ''
+            )
+        """)
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_offer_acceptances_user ON offer_acceptances(user_id)"
+        )
+        # Migratsiya — app_users'da offer_accepted_at bor, lekin offer_acceptances'da
+        # hali yozuvi yo'q mijozlarni ko'chiradi. Idempotent: qayta ishga tushirishda
+        # takrorlanmaydi (NOT EXISTS bilan tekshiriladi).
+        await db.execute("""
+            INSERT INTO offer_acceptances (user_id, offer_version, accepted_at, phone, fullname)
+            SELECT user_id, offer_version, offer_accepted_at, phone, fullname
+            FROM app_users
+            WHERE offer_accepted_at IS NOT NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM offer_acceptances WHERE offer_acceptances.user_id = app_users.user_id
+              )
+        """)
         await db.commit()
 
 
@@ -578,10 +650,42 @@ def _normalize_phone(phone: str) -> str:
     return phone.strip().replace(" ", "")
 
 
+async def _get_active_offer_row() -> tuple | None:
+    async with aiosqlite.connect(ADMINS_DB_PATH) as db:
+        async with db.execute(
+            "SELECT version, title, content, updated_at FROM offer_documents "
+            "WHERE is_active = 1 ORDER BY id DESC LIMIT 1"
+        ) as cur:
+            return await cur.fetchone()
+
+
+@app.get("/api/offer")
+async def get_offer():
+    """Ommaviy oferta (foydalanish shartlari) matni — autentifikatsiyasiz o'qiladi."""
+    row = await _get_active_offer_row()
+    if not row:
+        raise HTTPException(404, "Oferta matni topilmadi")
+    version, title, content, updated_at = row
+    return {
+        "version": version,
+        "updated_at": datetime.fromtimestamp(updated_at, tz=_UZB_TZ).strftime("%Y-%m-%d"),
+        "title": title,
+        "content": content,
+    }
+
+
+class OfferUpdateIn(BaseModel):
+    version: str
+    title: str
+    content: str
+
+
 class RegisterIn(BaseModel):
     fullname: str
     phone: str
     password: str
+    offer_accepted: bool = False
+    offer_version: str = ""
 
 
 class LoginIn(BaseModel):
@@ -601,10 +705,19 @@ async def register_user(data: RegisterIn):
         raise HTTPException(400, "Telefon raqam noto'g'ri formatda (+998XXXXXXXXX)")
     if len(password) < 6:
         raise HTTPException(400, "Parol kamida 6 belgidan iborat bo'lishi kerak")
+    if not data.offer_accepted:
+        raise HTTPException(400, "Ommaviy oferta shartlariga rozilik bildirilishi shart")
 
     salt = secrets.token_hex(16)
     pwd_hash = await asyncio.to_thread(_hash_password, password, salt)
     token = secrets.token_hex(32)
+    offer_accepted_at = int(time())
+    offer_version = data.offer_version.strip()
+    if not offer_version:
+        # Ilova versiyani yuborolmagan bo'lsa (masalan tarmoq xatosi) — DBdagi
+        # joriy faol versiyani ishlatamiz, eskirgan kod-ichidagi qiymat emas.
+        active_row = await _get_active_offer_row()
+        offer_version = active_row[0] if active_row else OFFER_VERSION
 
     async with aiosqlite.connect(USERS_DB_PATH) as db:
         async with db.execute(
@@ -617,8 +730,21 @@ async def register_user(data: RegisterIn):
             user_id = _generate_user_id()
             try:
                 await db.execute(
-                    "INSERT INTO app_users (user_id, phone, fullname, password_hash, salt, session_token) VALUES (?,?,?,?,?,?)",
-                    (user_id, phone, fullname, pwd_hash, salt, token),
+                    """
+                    INSERT INTO app_users
+                        (user_id, phone, fullname, password_hash, salt, session_token,
+                         offer_accepted_at, offer_version)
+                    VALUES (?,?,?,?,?,?,?,?)
+                    """,
+                    (user_id, phone, fullname, pwd_hash, salt, token,
+                     offer_accepted_at, offer_version),
+                )
+                await db.execute(
+                    """
+                    INSERT INTO offer_acceptances (user_id, offer_version, accepted_at, phone, fullname)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (user_id, offer_version, offer_accepted_at, phone, fullname),
                 )
                 await db.commit()
                 break
@@ -958,6 +1084,38 @@ def require_super(user: dict = Depends(get_current_user)):
     if not user["is_superadmin"]:
         raise HTTPException(403, "Faqat superadmin uchun")
     return user
+
+
+@app.put("/api/admin/offer")
+async def update_offer(data: OfferUpdateIn, _: dict = Depends(require_super)):
+    """Ommaviy oferta matnini yangilaydi — eski versiya o'chirilmaydi, faqat
+    is_active=0 qilinadi (tarix saqlanadi, kim qaysi versiyaga rozi bo'lgani
+    keyinchalik aniqlanishi uchun)."""
+    version = data.version.strip()
+    title = data.title.strip()
+    content = data.content.strip()
+    if not version or not title or not content:
+        raise HTTPException(400, "Versiya, sarlavha va matn to'ldirilishi shart")
+
+    async with aiosqlite.connect(ADMINS_DB_PATH) as db:
+        await db.execute("UPDATE offer_documents SET is_active = 0 WHERE is_active = 1")
+        await db.execute(
+            """
+            INSERT INTO offer_documents (version, title, content, updated_at, is_active)
+            VALUES (?, ?, ?, ?, 1)
+            """,
+            (version, title, content, int(time())),
+        )
+        await db.commit()
+
+    row = await _get_active_offer_row()
+    version, title, content, updated_at = row
+    return {
+        "version": version,
+        "updated_at": datetime.fromtimestamp(updated_at, tz=_UZB_TZ).strftime("%Y-%m-%d"),
+        "title": title,
+        "content": content,
+    }
 
 
 # ── Superadmin ilova (Android) — push, buyurtma tafsiloti, parol ────────────────
@@ -1932,7 +2090,11 @@ async def list_app_users(
         async with db.execute(
             f"""
             SELECT au.user_id, au.phone, au.fullname, au.created_at,
-                   COUNT(f.product_id) AS favorites_count
+                   COUNT(f.product_id) AS favorites_count,
+                   (SELECT offer_version FROM offer_acceptances oa
+                    WHERE oa.user_id = au.user_id ORDER BY oa.accepted_at DESC LIMIT 1) AS offer_version,
+                   (SELECT accepted_at FROM offer_acceptances oa
+                    WHERE oa.user_id = au.user_id ORDER BY oa.accepted_at DESC LIMIT 1) AS offer_accepted_at
             FROM app_users au
             LEFT JOIN favorites f ON f.telegram_id = au.user_id
             {where_sql}
@@ -1949,6 +2111,53 @@ async def list_app_users(
             {
                 "user_id": r[0], "phone": r[1], "fullname": r[2],
                 "created_at": r[3], "favorites_count": r[4],
+                "offer_version": r[5], "offer_accepted_at": r[6],
+            }
+            for r in rows
+        ],
+        "total_count": total_count,
+        "page": page,
+        "page_size": page_size,
+    }
+
+
+@app.get("/api/admin/offer-acceptances")
+async def list_offer_acceptances(
+    user_id: int = 0,
+    page: int = 1,
+    page_size: int = 20,
+    _: dict = Depends(require_super),
+):
+    """Ommaviy oferta roziligining to'liq tarixi (audit uchun) — bitta mijoz
+    bir necha marta turli versiyalarga rozi bo'lgan bo'lishi mumkin, hammasi
+    saqlanadi. user_id berilsa faqat o'sha mijoz tarixi qaytadi."""
+    page = max(1, page)
+    page_size = max(1, min(page_size, 100))
+    where_sql = "WHERE user_id = ?" if user_id else ""
+    params: list = [user_id] if user_id else []
+
+    async with aiosqlite.connect(USERS_DB_PATH) as db:
+        async with db.execute(f"SELECT COUNT(*) FROM offer_acceptances {where_sql}", params) as cur:
+            (total_count,) = await cur.fetchone()
+
+        offset = (page - 1) * page_size
+        async with db.execute(
+            f"""
+            SELECT id, user_id, offer_version, accepted_at, phone, fullname
+            FROM offer_acceptances
+            {where_sql}
+            ORDER BY accepted_at DESC
+            LIMIT ? OFFSET ?
+            """,
+            [*params, page_size, offset],
+        ) as cur:
+            rows = await cur.fetchall()
+
+    return {
+        "items": [
+            {
+                "id": r[0], "user_id": r[1], "offer_version": r[2],
+                "accepted_at": r[3], "phone": r[4], "fullname": r[5],
             }
             for r in rows
         ],

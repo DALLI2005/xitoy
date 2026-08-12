@@ -149,7 +149,20 @@ class MainActivity : ComponentActivity() {
                                     rootNavController.navigate("notification_permission") {
                                         popUpTo("login") { inclusive = true }
                                     }
-                                }
+                                },
+                                onOfferClick = { rootNavController.navigate("offer") }
+                            )
+                        }
+
+                        composable(
+                            "offer",
+                            enterTransition = slideEnter,
+                            exitTransition = slideExit,
+                            popEnterTransition = slidePopEnter,
+                            popExitTransition = slidePopExit
+                        ) {
+                            com.commander.xitoy.presentation.offer.OfferScreen(
+                                onBackClick = { rootNavController.popBackStack() }
                             )
                         }
 
